@@ -23,64 +23,20 @@
 #include <utility>
 #include <exception>
 #include <set>
+#include <ctime>
 
 namespace IttyZip
 {
-  struct CannotOpenException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip cannot open the output file for writing.";
-    }
-  };
-
-  struct DoubleOpenException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip::open() was called with an output file already open.";
-    }
-  };
-
-  struct NeverOpenedException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip::addFile() or finalize() was called, but an output file was never opened.";
-    }
-  };
-
-  struct UnexpectedCloseException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip exception: The output file closed unexpectedly.";
-    }
-  };
-
-  struct OutputFailException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip exception: The output stream failed.";
-    }
-  };
-
-  struct EmptyFinalizeException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip::finalize() was called on an empty IttyZip object.";
-    }
-  };
-
-  struct DuplicateFileException : public std::exception
-  {
-    const char *what() const noexcept(false)
-    {
-      return "IttyZip::addFile() was called twice with the same filename.";
-    }
-  };
+  /**
+   * Messages for the "what()" in exceptions thrown by IttyZip
+   */
+  const char CANNOT_OPEN_MESG[]      = "IttyZip cannot open the output file for writing.";
+  const char DOUBLE_OPEN_MESG[]      = "IttyZip::open() was called with an output file already open.";
+  const char NOT_OPENED_MESG[]       = "IttyZip::addFile() or finalize() called either before the output file has been opened or after it has been closed.";
+  const char UNEXPECTED_CLOSE_MESG[] = "IttyZip exception: The output file closed unexpectedly.";
+  const char OUTPUT_FAIL_MESG[]      = "IttyZip exception: The output stream failed.";
+  const char EMPTY_FINALIZE_MESG[]   = "IttyZip::finalize() was called on an empty IttyZip object.";
+  const char DUPLICATE_FILE_MESG[]   = "IttyZip::addFile() was called twice with the same filename.";
 
   /**
    * Struct to hold a standard DOS format time + date stamp.
@@ -152,6 +108,12 @@ namespace IttyZip
     uint16_t comment_length;
   } endrecord_t;
 
+  std::tm localtime_locked(const std::time_t &timepoint) noexcept;
+  dostimedate_t dosTimeDate(void) noexcept;
+  uint32_t crc32(const std::string &data) noexcept;
+  void uint16_to_buffer(const uint16_t in, char *out) noexcept;
+  void uint32_to_buffer(const uint32_t in, char *out) noexcept;
+
   class IttyZip 
   {
   public:
@@ -162,15 +124,11 @@ namespace IttyZip
     void finalize(void) noexcept(false);
 
   private:
-    uint32_t crc32(const std::string &data) const noexcept;
-    dostimedate_t dosTimeDate(void) const noexcept;
-    std::pair<localheader_t, dirheader_t> generateHeaders(const std::string &filename, uint32_t file_size, uint32_t file_crc32) const noexcept;
+    std::pair<localheader_t, dirheader_t> generateHeaders(const std::string &filename, const uint32_t file_size, const uint32_t file_crc32) const noexcept;
     uint32_t writeLocalheader(const localheader_t &localheader) noexcept(false);
     void storeDirheader(const dirheader_t &dirheader) noexcept;
     endrecord_t generateEndRecord(void) const noexcept;
     void writeEndRecord(const endrecord_t &end_record) noexcept(false);
-    void uint16_to_buffer(uint16_t in, char *out) const noexcept;
-    void uint32_to_buffer(uint32_t in, char *out) const noexcept;
 
     /**
      * The number of files already stored in this IttyZip archive.
@@ -184,8 +142,10 @@ namespace IttyZip
 
     /**
      * True if an output file has been opened and finalize()
-     * has not yet been called. addFile() may be called in
-     * this condition.
+     * has not yet been called. addFile() may be called when
+     * opened is true. finalize() may be called if at least
+     * one file has been added to this IttyZip object and
+     * opened is true.
      */
     bool opened;
 

@@ -18,152 +18,55 @@
 #include <chrono>
 #include <ctime>
 #include <algorithm>
+#include <thread>
+#include <mutex>
 
 namespace IttyZip
 {
   /**
-   * Default constructor.
-   * Use the IttyZip::open() method to specify the output file
-   * if the IttyZip object is constructed with this constructor.
+   * localtime is not thread safe, and neither localtime_s nor localtime_r
+   * is portable. Recommend using localtime_locked everywhere (or an
+   * equivalent replacement here) if IttyZip is incorporated into a
+   * multithreaded program.
    */
-  IttyZip::IttyZip(void) noexcept : num_files(0u), opened(false), next_offset(0u) { }
-
-  /**
-   * Constructor that takes an output file filename
-   * and attempts to open said output file.
-   */
-  IttyZip::IttyZip(const std::string &outputFilename) noexcept(false) : num_files(0u), next_offset(0u)
+  std::tm localtime_locked(const std::time_t &timepoint) noexcept
   {
-    opened = false;
-    out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
-    if (!out_file.is_open())
-    {
-      throw CannotOpenException();
-    }
-    else
-    {
-      opened = true;
-    }
+    static std::mutex localtime_mutex;
+    std::lock_guard<std::mutex> localtime_lock(localtime_mutex);
+    std::tm timestruct = *std::localtime(&timepoint);
+    return timestruct;
   }
 
   /**
-   * open() attempts to open the output file specified
-   * by outputFilename.
-   *
-   * open() is only meant to be called after finalize() or on
-   * a default constructed IttyZip object.
+   * Creates a DOS type time + date stamp from
+   * the present system time + date.
+   * Calls localtime_locked.
    */
-  void IttyZip::open(const std::string &outputFilename) noexcept(false)
+  dostimedate_t dosTimeDate(void) noexcept
   {
-    if (opened || out_file.is_open())
-    {
-      throw DoubleOpenException();
-    }
-    else
-    {
-      opened = false;
-      num_files = 0u;
-      next_offset = 0u;
-      central_directory.clear();
-      out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
-      if (!out_file.is_open())
-      {
-        throw CannotOpenException();
-      }
-      else
-      {
-        opened = true;
-      }
-    }
-  }
+    std::time_t timepoint = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm timestruct = localtime_locked(timepoint);
+    dostimedate_t output;
 
-  /**
-   * addFile() adds a new file to the IttyZip archive.
-   * filename specifies the full path of the file in the archive.
-   * contents stores the contents of the file.
-   *
-   * Since addFile() writes the contents to the output archive
-   * immediately, addFile() may only be called on an IttyZip
-   * object that has an open output file.
-   */
-  void IttyZip::addFile(const std::string &filename, const std::string &contents) noexcept(false)
-  {
-    if (!opened)
-    {
-      throw NeverOpenedException();
-    }
-    else if (!out_file.is_open())
-    {
-      throw UnexpectedCloseException();
-    }
-    else if (out_file.fail())
-    {
-      throw OutputFailException();
-    }
-    else
-    {
-      uint32_t file_crc32 = crc32(contents);
-      std::pair<localheader_t, dirheader_t> file_headers = generateHeaders(filename, static_cast<uint32_t>(contents.size()), file_crc32);
-      std::pair<std::set<std::string>::iterator, bool> ins_ret = filenames.insert(file_headers.first.filename);
-      if (!ins_ret.second)
-      {
-        throw DuplicateFileException();
-      }
-      else
-      {
-        storeDirheader(file_headers.second);
-        next_offset += writeLocalheader(file_headers.first);
-        out_file.write(contents.c_str(), contents.length());
-        next_offset += static_cast<uint32_t>(contents.size());
-        num_files++;
-      }
-    }
-  }
+    output.time = 0x001Fu & (std::min(timestruct.tm_sec, 59) / 2);
+    output.time |= 0x07E0u & (timestruct.tm_min << 5);
+    output.time |= 0xF800u & (timestruct.tm_hour << 11);
 
-  /**
-   * finalize() writes the central directory and the end of
-   * central directory record to the output ZIP file and then
-   * closes the output file.
-   *
-   * There must be at least one valid file in the IttyZip
-   * archive before finalize() is called.
-   */
-  void IttyZip::finalize(void) noexcept(false)
-  {
-    if (num_files == 0u || next_offset == 0u || central_directory.empty())
+    output.date = 0x001Fu & timestruct.tm_mday;
+    output.date |= 0x01E0u & ((timestruct.tm_mon + 1) << 5);
+    if (timestruct.tm_year >= 80 && timestruct.tm_year - 80 < 128)
     {
-      throw EmptyFinalizeException();
+      output.date |= 0xFE00u & ((timestruct.tm_year - 80) << 9);
     }
-    else if (!opened)
-    {
-      throw NeverOpenedException();
-    }
-    else if (!out_file.is_open())
-    {
-      throw UnexpectedCloseException();
-    }
-    else if (out_file.fail())
-    {
-      throw OutputFailException();
-    }
-    else
-    {
-      out_file.write(central_directory.c_str(), central_directory.size());
-      endrecord_t end_record = generateEndRecord();
-      writeEndRecord(end_record);
-      out_file.close();
-      opened = false;
-      next_offset = 0u;
-      central_directory.clear();
-      num_files = 0u;
-    }
+
+    return output;
   }
 
   /**
    * Calculates the CRC-32 checksum variant used by ZIP on 
-   * data.
+   * the input string data.
    */
-  uint32_t IttyZip::crc32(const std::string &data) const noexcept
+  uint32_t crc32(const std::string &data) noexcept
   {
     static const uint32_t crc32_table[256] = {0x00000000u, 0x77073096u, 0xEE0E612Cu, 0x990951BAu, 0x076DC419u, 0x706AF48Fu, 0xE963A535u, 0x9E6495A3u, 0x0EDB8832u, 0x79DCB8A4u, 0xE0D5E91Eu, 
       0x97D2D988u, 0x09B64C2Bu, 0x7EB17CBDu, 0xE7B82D07u, 0x90BF1D91u, 0x1DB71064u, 0x6AB020F2u, 0xF3B97148u, 0x84BE41DEu, 0x1ADAD47Du, 0x6DDDE4EBu, 0xF4D4B551u, 0x83D385C7u, 0x136C9856u, 0x646BA8C0u, 
@@ -196,35 +99,174 @@ namespace IttyZip
   }
 
   /**
-   * Creates a DOS type time + date stamp from
-   * the present system time + date.
+   * Helper routine that stores a uint16_t value in
+   * an output buffer >= 2 bytes long in little endian
+   * byte order.
    */
-  dostimedate_t IttyZip::dosTimeDate(void) const noexcept
+  void uint16_to_buffer(const uint16_t in, char *out) noexcept
   {
-    std::time_t timepoint = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    struct tm * timestruct = std::localtime(&timepoint);
-    dostimedate_t output;
+    out[0] = static_cast<char>(0x00FFu & in);
+    out[1] = static_cast<char>(0x00FFu & (in >> 8));
+  }
 
-    output.time = 0x001Fu & (std::min(timestruct->tm_sec, 59) / 2);
-    output.time |= 0x07E0u & (timestruct->tm_min << 5);
-    output.time |= 0xF800u & (timestruct->tm_hour << 11);
+  /**
+   * Helper routine that stores a uint32_t value in
+   * an output buffer >= 4 bytes long in little endian
+   * byte order.
+   */
+  void uint32_to_buffer(const uint32_t in, char *out) noexcept
+  {
+    out[0] = static_cast<char>(0x000000FFu & in);
+    out[1] = static_cast<char>(0x000000FFu & (in >> 8));
+    out[2] = static_cast<char>(0x000000FFu & (in >> 16));
+    out[3] = static_cast<char>(0x000000FFu & (in >> 24));
+  }
 
-    output.date = 0x001Fu & timestruct->tm_mday;
-    output.date |= 0x01E0u & ((timestruct->tm_mon + 1) << 5);
-    if (timestruct->tm_year >= 80 && timestruct->tm_year - 80 < 128)
+  /**
+   * Default constructor.
+   * Use the IttyZip::open() method to specify the output file
+   * if the IttyZip object is constructed with this constructor.
+   */
+  IttyZip::IttyZip(void) noexcept : num_files(0u), opened(false), next_offset(0u) { }
+
+  /**
+   * Constructor that takes an output file filename
+   * and attempts to open said output file.
+   */
+  IttyZip::IttyZip(const std::string &outputFilename) noexcept(false) : num_files(0u), next_offset(0u)
+  {
+    opened = false;
+    out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!out_file.is_open())
     {
-      output.date |= 0xFE00u & ((timestruct->tm_year - 80) << 9);
+      throw std::exception(CANNOT_OPEN_MESG);
     }
+    else
+    {
+      opened = true;
+    }
+  }
 
-    return output;
+  /**
+   * open() attempts to open the output file specified
+   * by outputFilename.
+   *
+   * open() is only meant to be called after finalize() or on
+   * a default constructed IttyZip object.
+   */
+  void IttyZip::open(const std::string &outputFilename) noexcept(false)
+  {
+    if (opened || out_file.is_open())
+    {
+      throw std::exception(DOUBLE_OPEN_MESG);
+    }
+    else
+    {
+      opened = false;
+      num_files = 0u;
+      next_offset = 0u;
+      central_directory.clear();
+      out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
+      if (!out_file.is_open())
+      {
+        throw std::exception(CANNOT_OPEN_MESG);
+      }
+      else
+      {
+        opened = true;
+      }
+    }
+  }
+
+  /**
+   * addFile() adds a new file to the IttyZip archive.
+   * filename specifies the full path of the file in the archive.
+   * contents stores the contents of the file.
+   *
+   * Since addFile() writes the contents to the output archive
+   * immediately, addFile() may only be called on an IttyZip
+   * object that has an open output file.
+   */
+  void IttyZip::addFile(const std::string &filename, const std::string &contents) noexcept(false)
+  {
+    if (!opened)
+    {
+      throw std::exception(NOT_OPENED_MESG);
+    }
+    else if (!out_file.is_open())
+    {
+      throw std::exception(UNEXPECTED_CLOSE_MESG);
+    }
+    else if (out_file.fail())
+    {
+      throw std::exception(OUTPUT_FAIL_MESG);
+    }
+    else
+    {
+      uint32_t file_crc32 = crc32(contents);
+      std::pair<localheader_t, dirheader_t> file_headers = generateHeaders(filename, static_cast<uint32_t>(contents.size()), file_crc32);
+      std::pair<std::set<std::string>::iterator, bool> ins_ret = filenames.insert(file_headers.first.filename);
+      if (!ins_ret.second)
+      {
+        throw std::exception(DUPLICATE_FILE_MESG);
+      }
+      else
+      {
+        storeDirheader(file_headers.second);
+        next_offset += writeLocalheader(file_headers.first);
+        out_file.write(contents.c_str(), contents.length());
+        next_offset += static_cast<uint32_t>(contents.size());
+        num_files++;
+      }
+    }
+  }
+
+  /**
+   * finalize() writes the central directory and the end of
+   * central directory record to the output ZIP file and then
+   * closes the output file.
+   *
+   * At least one file must have been added to this IttyZip
+   * object before finalize() is called. This in turn requires
+   * that the output file has already been opened.
+   */
+  void IttyZip::finalize(void) noexcept(false)
+  {
+    if (num_files == 0u || next_offset == 0u || central_directory.empty())
+    {
+      throw std::exception(EMPTY_FINALIZE_MESG);
+    }
+    else if (!opened)
+    {
+      throw std::exception(NOT_OPENED_MESG);
+    }
+    else if (!out_file.is_open())
+    {
+      throw std::exception(UNEXPECTED_CLOSE_MESG);
+    }
+    else if (out_file.fail())
+    {
+      throw std::exception(OUTPUT_FAIL_MESG);
+    }
+    else
+    {
+      out_file.write(central_directory.c_str(), central_directory.size());
+      endrecord_t end_record = generateEndRecord();
+      writeEndRecord(end_record);
+      out_file.close();
+      opened = false;
+      next_offset = 0u;
+      central_directory.clear();
+      num_files = 0u;
+    }
   }
 
   /**
    * Generates the local file header and the central directory
    * file header for the file with name filename, size file_size
-   * (in bytes) and contents CRC-32 checksum file_crc32.
+   * (in bytes) and file contents CRC-32 checksum file_crc32.
    */
-  std::pair<localheader_t, dirheader_t> IttyZip::generateHeaders(const std::string &filename, uint32_t file_size, uint32_t file_crc32) const noexcept
+  std::pair<localheader_t, dirheader_t> IttyZip::generateHeaders(const std::string &filename, const uint32_t file_size, const uint32_t file_crc32) const noexcept
   {
     std::pair<localheader_t, dirheader_t> output;
     /* The signatures are defined by the ZIP specification. */
@@ -283,15 +325,15 @@ namespace IttyZip
   {
     if (!opened)
     {
-      throw NeverOpenedException();
+      throw std::exception(NOT_OPENED_MESG);
     }
     else if (!out_file.is_open())
     {
-      throw UnexpectedCloseException();
+      throw std::exception(UNEXPECTED_CLOSE_MESG);
     }
     else if (out_file.fail())
     {
-      throw OutputFailException();
+      throw std::exception(OUTPUT_FAIL_MESG);
     }
     else
     {
@@ -398,15 +440,15 @@ namespace IttyZip
   {
     if (!opened)
     {
-      throw NeverOpenedException();
+      throw std::exception(NOT_OPENED_MESG);
     }
     else if (!out_file.is_open())
     {
-      throw UnexpectedCloseException();
+      throw std::exception(UNEXPECTED_CLOSE_MESG);
     }
     else if (out_file.fail())
     {
-      throw OutputFailException();
+      throw std::exception(OUTPUT_FAIL_MESG);
     }
     else
     {
@@ -428,30 +470,6 @@ namespace IttyZip
       uint16_to_buffer(end_record.comment_length, write_buffer);
       out_file.write(write_buffer, 2);
     }
-  }
-
-  /**
-   * Helper routine that stores a uint16_t value in
-   * an output buffer >= 2 bytes long in little endian
-   * byte order.
-   */
-  void IttyZip::uint16_to_buffer(uint16_t in, char *out) const noexcept
-  {
-    out[0] = static_cast<char>(0x00FFu & in);
-    out[1] = static_cast<char>(0x00FFu & (in >> 8));
-  }
-
-  /**
-   * Helper routine that stores a uint32_t value in
-   * an output buffer >= 4 bytes long in little endian
-   * byte order.
-   */
-  void IttyZip::uint32_to_buffer(uint32_t in, char *out) const noexcept
-  {
-    out[0] = static_cast<char>(0x000000FFu & in);
-    out[1] = static_cast<char>(0x000000FFu & (in >> 8));
-    out[2] = static_cast<char>(0x000000FFu & (in >> 16));
-    out[3] = static_cast<char>(0x000000FFu & (in >> 24));
   }
 }
 
