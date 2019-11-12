@@ -4,7 +4,9 @@ This repository holds C++ code intended to aid in generating Office Open XML doc
 
 ## Getting Started
 
-For now, the only code is in the IttyZip/ directory. Hopefully there will be more to come.
+IttyZip is a lightweight class for generating ZIP files from strings; it does not provide compression.
+
+BasicWorkbook enables the creation of simple spreadsheet files using only a few methods.
 
 ## Contributing
 

@@ -23,6 +23,10 @@
 
 namespace IttyZip
 {
+
+  /* mutex used by localtime_locked and gmtime_locked */
+  static std::mutex time_mutex;
+
   /**
    * localtime is not thread safe, and neither localtime_s nor localtime_r
    * is portable. Recommend using localtime_locked everywhere (or an
@@ -31,9 +35,21 @@ namespace IttyZip
    */
   std::tm localtime_locked(const std::time_t &timepoint) noexcept
   {
-    static std::mutex localtime_mutex;
-    std::lock_guard<std::mutex> localtime_lock(localtime_mutex);
+    std::lock_guard<std::mutex> localtime_lock(time_mutex);
     std::tm timestruct = *std::localtime(&timepoint);
+    return timestruct;
+  }
+
+  /**
+   * gmtime is not thread safe, and neither gmtime_s nor gmtime_r
+   * is portable. Recommend using gmtime_locked everywhere (or an
+   * equivalent replacement here) if IttyZip is incorporated into a
+   * multithreaded program.
+   */
+  std::tm gmtime_locked(const std::time_t &timepoint) noexcept
+  {
+    std::lock_guard<std::mutex> gmtime_lock(time_mutex);
+    std::tm timestruct = *std::gmtime(&timepoint);
     return timestruct;
   }
 

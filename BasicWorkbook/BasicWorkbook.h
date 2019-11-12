@@ -1,9 +1,7 @@
 /**
- * IttyZip.h
+ * BasicWorkbook.h
  * 
- * Declarations and typedefs for IttyZip, a class that generates
- * ZIP archive files from C++ strings. It stays lightweight by
- * foregoing compression.
+ * TODO: proper file header.
  * 
  * Written in 2019 by Ben Tesch.
  *
@@ -14,165 +12,164 @@
  * end of this file. If not, see http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-#ifndef ITTY_ZIP_H_
-#define ITTY_ZIP_H_
+#ifndef BASIC_WORKBOOK_H_
+#define BASIC_WORKBOOK_H_
 
-#include <string>
 #include <cinttypes>
-#include <fstream>
+#include <string>
 #include <utility>
-#include <exception>
 #include <set>
-#include <ctime>
+#include <vector>
+#include "IttyZip.h"
 
-namespace IttyZip
+namespace BasicWorkbook
 {
   /**
-   * Messages for the "what()" in exceptions thrown by IttyZip
+   * These are the default row and column maximum indices
+   * for a worksheet according to the ECMA376 standard.
+   * A popular office software suite has the same limits.
    */
-  const char CANNOT_OPEN_MESG[]      = "IttyZip cannot open the output file for writing.";
-  const char DOUBLE_OPEN_MESG[]      = "IttyZip::open() was called with an output file already open.";
-  const char NOT_OPENED_MESG[]       = "IttyZip::addFile() or finalize() called either before the output file has been opened or after it has been closed.";
-  const char UNEXPECTED_CLOSE_MESG[] = "IttyZip exception: The output file closed unexpectedly.";
-  const char OUTPUT_FAIL_MESG[]      = "IttyZip exception: The output stream failed.";
-  const char EMPTY_FINALIZE_MESG[]   = "IttyZip::finalize() was called on an empty IttyZip object.";
-  const char DUPLICATE_FILE_MESG[]   = "IttyZip::addFile() was called twice with the same filename.";
+  const uint32_t MAX_ROW = 1048576u;
+  const uint32_t MAX_COL = 16384u;
 
   /**
-   * Struct to hold a standard DOS format time + date stamp.
-   * Note that this format is still around in 2019.
+   * This type holds a cell reference as a pair of uint32_t numbers.
    */
   typedef struct
   {
-    uint16_t time;
-    uint16_t date;
-  } dostimedate_t;
+    uint32_t row;
+    uint32_t col;
+  } integerref_t;
 
   /**
-   * Struct to hold the local file header of a file
-   * in a ZIP archive.
+   * BasicWorkbook only supports three cell types:
+   * 0: a cell containing a numeric value
+   * 1: a cell containing a formula
+   * 2: a cell containing a string
+   */
+  enum class CellType : uint8_t
+  {
+    NUMBER = 0u,
+    FORMULA = 1u,
+    STRING = 2u
+  };
+
+  /**
+   * This is the representation of a single cell in
+   * BasicWorkbook. Both formula type cells and
+   * string type cells store their value in the
+   * same string.
    */
   typedef struct
   {
-    uint32_t signature;
-    uint16_t extract_version;
-    uint16_t general_bit_flag;
-    uint16_t compression_method;
-    dostimedate_t file_mod_timedate;
-    uint32_t crc32;
-    uint32_t size_compressed;
-    uint32_t size_uncompressed;
-    uint16_t filename_length;
-    uint16_t extra_field_length;
-    std::string filename;
-  } localheader_t;
+    integerref_t integerref;
+    CellType type;
+    double num_val;
+    std::string str_fml_val;
+  } cell_t;
 
-  /**
-   * Struct to hold the central directory file header
-   * of a file in a ZIP archive.
-   */
-  typedef struct
+  struct cell_sort_compare
   {
-    uint32_t signature;
-    uint16_t version_made_by;
-    uint16_t extract_version;
-    uint16_t general_bit_flag;
-    uint16_t compression_method;
-    dostimedate_t file_mod_timedate;
-    uint32_t crc32;
-    uint32_t size_compressed;
-    uint32_t size_uncompressed;
-    uint16_t filename_length;
-    uint16_t extra_field_length;
-    uint16_t comment_length;
-    uint16_t disk_number_start;
-    uint16_t internal_attributes;
-    uint32_t external_attributes;
-    uint32_t local_header_offset;
-    std::string filename;
-  } dirheader_t;
+    bool operator() (const cell_t &a, const cell_t &b) const noexcept;
+  };
 
-  /**
-   * Struct to hold a ZIP archive end of central directory
-   * record.
-   */
-  typedef struct
-  {
-    uint32_t signature;
-    uint16_t disk_number;
-    uint16_t dir_start_disk_number;
-    uint16_t this_disk_entries;
-    uint16_t total_entries;
-    uint32_t central_dir_size;
-    uint32_t central_dir_offset;
-    uint16_t comment_length;
-  } endrecord_t;
+  uint32_t column_to_integer(const std::string &column) noexcept(false);
+  std::string integer_to_column(uint32_t decimal) noexcept(false);
+  integerref_t mixedref_to_integerref(const std::string &mixedref) noexcept(false);
+  std::string integerref_to_mixedref(const uint32_t row, const uint32_t col) noexcept(false);
+  std::string integerref_to_mixedref(const integerref_t &integerref) noexcept(false);
+  bool case_insensitive_same(const std::string &a, const std::string &b) noexcept;
 
-  std::tm localtime_locked(const std::time_t &timepoint) noexcept;
-  std::tm gmtime_locked(const std::time_t &timepoint) noexcept;
-  dostimedate_t dosTimeDate(void) noexcept;
-  uint32_t crc32(const std::string &data) noexcept;
-  void uint16_to_buffer(const uint16_t in, char *out) noexcept;
-  void uint32_to_buffer(const uint32_t in, char *out) noexcept;
-
-  class IttyZip 
+  class Sheet
   {
   public:
-    IttyZip(void) noexcept;
-    IttyZip(const std::string &outputFilename) noexcept(false);
-    void open(const std::string &outputFilename) noexcept(false);
-    void addFile(const std::string &filename, const std::string &contents) noexcept(false);
-    void finalize(void) noexcept(false);
+    void add_number_cell(const uint32_t row, const uint32_t col, const double number) noexcept(false);
+    void add_number_cell(const integerref_t &integerref, const double number) noexcept(false);
+    void add_number_cell(const std::string &mixedref, const double number) noexcept(false);
+    void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula) noexcept(false);
+    void add_formula_cell(const integerref_t &integerref, const std::string &formula) noexcept(false);
+    void add_formula_cell(const std::string &mixedref, const std::string &formula) noexcept(false);
+    void add_string_cell(const uint32_t row, const uint32_t col, const std::string &value) noexcept(false);
+    void add_string_cell(const integerref_t &integerref, const std::string &value) noexcept(false);
+    void add_string_cell(const std::string &mixedref, const std::string &value) noexcept(false);
+    std::string get_name(void) const noexcept;
 
   private:
-    std::pair<localheader_t, dirheader_t> generateHeaders(const std::string &filename, const uint32_t file_size, const uint32_t file_crc32) const noexcept;
-    uint32_t writeLocalheader(const localheader_t &localheader) noexcept(false);
-    void storeDirheader(const dirheader_t &dirheader) noexcept;
-    endrecord_t generateEndRecord(void) const noexcept;
-    void writeEndRecord(const endrecord_t &end_record) noexcept(false);
+    Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_) noexcept(false);
+    std::string generate_file(void) const noexcept;
 
     /**
-     * The number of files already stored in this IttyZip archive.
+     * The name of the Sheet as displayed on the tab used to view
+     * the Sheet in a popular office software suite.
+     * Must not be empty. This is the only data member besides the
+     * cells that is provided by the user of BasicWorkbook (through
+     * Workbook::addSheet).
      */
-    uint16_t num_files;
+    std::string name;
 
     /**
-     * An ofstream for writing to the output ZIP file.
+     * The filename of the Sheet .xml file inside the Workbook
+     * ZIP archive. Managed automatically by the Workbook class.
      */
-    std::ofstream out_file;
+    std::string filename;
 
     /**
-     * True if an output file has been opened and finalize()
-     * has not yet been called. addFile() may be called when
-     * opened is true. finalize() may be called if at least
-     * one file has been added to this IttyZip object and
-     * opened is true.
+     * The numeric ID of this Sheet in the Workbook. Managed
+     * automatically by the Workbook class.
      */
-    bool opened;
+    uint32_t sheetId;
 
     /**
-     * Offset in bytes from the start of the output file
-     * at which the next local header (or at which the central
-     * directory) will be written.
+     * The relationship ID of this Sheet in the Workbook. Managed
+     * automatically by the Workbook class.
      */
-    uint32_t next_offset;
+    std::string relId;
 
     /**
-     * Temporary storage for the ZIP archive central directory,
-     * since this part of the file is written at the very end.
+     * This Sheet's cells are stored in a set so that they are
+     * maintained in sorted order for easier Sheet .xml file
+     * generation later. This also helps detect duplicate additions
+     * of a cell at the same reference.
+     *
+     * Cells are added through the various overloaded methods
+     * Sheet::add_number_cell()
+     * Sheet::add_formula_cell()
+     * Sheet::add_string_cell()
      */
-    std::string central_directory;
+    std::set<cell_t, cell_sort_compare> cells;
+
+    friend class Workbook;
+  };
+
+  class Workbook
+  {
+  public:
+    Workbook(const std::string filename) noexcept(false);
+    Sheet& addSheet(const std::string &name) noexcept(false);
+    void publish(void) noexcept(false);
+
+  private:
+    /**
+     * All of this Workbook's sheets are stored in this vector.
+     * Compared to a set, duplicate name search is O(n) instead
+     * of O(log n), but I don't anticipate very many sheets compared
+     * to cells, and the case-insensitive duplicate name comparison
+     * is easier to write in a linear search over a vector.
+     * Basically, I'm punting on this one.
+     */
+    std::vector<Sheet> sheets;
 
     /**
-     * Set containing the full filenames of all files previously
-     * added to the IttyZip archive. Purely used to check for
-     * duplicate files.
+     * All Office Open XML files are stored in ZIP archives as the
+     * container format. This IttyZip archive manages the conversion
+     * from XML files represented as std::strings into an actual
+     * ZIP archive file on disk.
      */
-    std::set<std::string> filenames;
+    IttyZip::IttyZip archive;
   };
 }
 
-#endif /* #ifndef ITTY_ZIP_H_ */
+#endif /* #ifndef BASIC_WORKBOOK_H_ */
 
 /*
 Creative Commons Legal Code

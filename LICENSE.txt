@@ -2,6 +2,9 @@ All files produced by the author of this repository, including
 IttyZip.cpp
 IttyZip.h
 IttyZipDemo.cpp
+BasicWorkbook.cpp
+BasicWorkbook.h
+BasicWorkbookDemo.cpp
 are published under the CC0 1.0 Universal Public Domain Dedication,
 which is reproduced below.
 

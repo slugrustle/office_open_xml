@@ -1,9 +1,9 @@
 /**
- * IttyZip.h
+ * BasicWorkbookDemo.cpp
  * 
- * Declarations and typedefs for IttyZip, a class that generates
- * ZIP archive files from C++ strings. It stays lightweight by
- * foregoing compression.
+ * A simple demonstration of the main capabilities of the BasicWorkbook
+ * class. Generates a simple spreadsheet file with all three supported
+ * cell types: Numeric value, formula, and string/text value.
  * 
  * Written in 2019 by Ben Tesch.
  *
@@ -14,165 +14,32 @@
  * end of this file. If not, see http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-#ifndef ITTY_ZIP_H_
-#define ITTY_ZIP_H_
+#include "BasicWorkbook.h"
 
-#include <string>
-#include <cinttypes>
-#include <fstream>
-#include <utility>
-#include <exception>
-#include <set>
-#include <ctime>
-
-namespace IttyZip
+int main()
 {
-  /**
-   * Messages for the "what()" in exceptions thrown by IttyZip
-   */
-  const char CANNOT_OPEN_MESG[]      = "IttyZip cannot open the output file for writing.";
-  const char DOUBLE_OPEN_MESG[]      = "IttyZip::open() was called with an output file already open.";
-  const char NOT_OPENED_MESG[]       = "IttyZip::addFile() or finalize() called either before the output file has been opened or after it has been closed.";
-  const char UNEXPECTED_CLOSE_MESG[] = "IttyZip exception: The output file closed unexpectedly.";
-  const char OUTPUT_FAIL_MESG[]      = "IttyZip exception: The output stream failed.";
-  const char EMPTY_FINALIZE_MESG[]   = "IttyZip::finalize() was called on an empty IttyZip object.";
-  const char DUPLICATE_FILE_MESG[]   = "IttyZip::addFile() was called twice with the same filename.";
+  BasicWorkbook::Workbook workbook("test1.xlsx");
+  BasicWorkbook::Sheet &sheet1 = workbook.addSheet("sheet1");
+  sheet1.add_string_cell("A1", "col 1");
+  sheet1.add_number_cell("A2", 1.0);
+  sheet1.add_number_cell("A3", 2.0);
+  sheet1.add_number_cell("A4", 3.0);
+  sheet1.add_string_cell("B1", "col 2");
+  sheet1.add_number_cell("B2", 4.0);
+  sheet1.add_number_cell("B3", 5.0);
+  sheet1.add_number_cell("B4", 6.0);
+  sheet1.add_string_cell("C1", "col 3");
+  sheet1.add_formula_cell("C2", "A2+B2");
+  sheet1.add_formula_cell("C3", "A3+B3");
+  sheet1.add_formula_cell("C4", "A4+B4");
 
-  /**
-   * Struct to hold a standard DOS format time + date stamp.
-   * Note that this format is still around in 2019.
-   */
-  typedef struct
-  {
-    uint16_t time;
-    uint16_t date;
-  } dostimedate_t;
+  BasicWorkbook::Sheet &sheet2 = workbook.addSheet("sheet2");
+  sheet2.add_string_cell("A1", "hi!");
 
-  /**
-   * Struct to hold the local file header of a file
-   * in a ZIP archive.
-   */
-  typedef struct
-  {
-    uint32_t signature;
-    uint16_t extract_version;
-    uint16_t general_bit_flag;
-    uint16_t compression_method;
-    dostimedate_t file_mod_timedate;
-    uint32_t crc32;
-    uint32_t size_compressed;
-    uint32_t size_uncompressed;
-    uint16_t filename_length;
-    uint16_t extra_field_length;
-    std::string filename;
-  } localheader_t;
+  workbook.publish();
 
-  /**
-   * Struct to hold the central directory file header
-   * of a file in a ZIP archive.
-   */
-  typedef struct
-  {
-    uint32_t signature;
-    uint16_t version_made_by;
-    uint16_t extract_version;
-    uint16_t general_bit_flag;
-    uint16_t compression_method;
-    dostimedate_t file_mod_timedate;
-    uint32_t crc32;
-    uint32_t size_compressed;
-    uint32_t size_uncompressed;
-    uint16_t filename_length;
-    uint16_t extra_field_length;
-    uint16_t comment_length;
-    uint16_t disk_number_start;
-    uint16_t internal_attributes;
-    uint32_t external_attributes;
-    uint32_t local_header_offset;
-    std::string filename;
-  } dirheader_t;
-
-  /**
-   * Struct to hold a ZIP archive end of central directory
-   * record.
-   */
-  typedef struct
-  {
-    uint32_t signature;
-    uint16_t disk_number;
-    uint16_t dir_start_disk_number;
-    uint16_t this_disk_entries;
-    uint16_t total_entries;
-    uint32_t central_dir_size;
-    uint32_t central_dir_offset;
-    uint16_t comment_length;
-  } endrecord_t;
-
-  std::tm localtime_locked(const std::time_t &timepoint) noexcept;
-  std::tm gmtime_locked(const std::time_t &timepoint) noexcept;
-  dostimedate_t dosTimeDate(void) noexcept;
-  uint32_t crc32(const std::string &data) noexcept;
-  void uint16_to_buffer(const uint16_t in, char *out) noexcept;
-  void uint32_to_buffer(const uint32_t in, char *out) noexcept;
-
-  class IttyZip 
-  {
-  public:
-    IttyZip(void) noexcept;
-    IttyZip(const std::string &outputFilename) noexcept(false);
-    void open(const std::string &outputFilename) noexcept(false);
-    void addFile(const std::string &filename, const std::string &contents) noexcept(false);
-    void finalize(void) noexcept(false);
-
-  private:
-    std::pair<localheader_t, dirheader_t> generateHeaders(const std::string &filename, const uint32_t file_size, const uint32_t file_crc32) const noexcept;
-    uint32_t writeLocalheader(const localheader_t &localheader) noexcept(false);
-    void storeDirheader(const dirheader_t &dirheader) noexcept;
-    endrecord_t generateEndRecord(void) const noexcept;
-    void writeEndRecord(const endrecord_t &end_record) noexcept(false);
-
-    /**
-     * The number of files already stored in this IttyZip archive.
-     */
-    uint16_t num_files;
-
-    /**
-     * An ofstream for writing to the output ZIP file.
-     */
-    std::ofstream out_file;
-
-    /**
-     * True if an output file has been opened and finalize()
-     * has not yet been called. addFile() may be called when
-     * opened is true. finalize() may be called if at least
-     * one file has been added to this IttyZip object and
-     * opened is true.
-     */
-    bool opened;
-
-    /**
-     * Offset in bytes from the start of the output file
-     * at which the next local header (or at which the central
-     * directory) will be written.
-     */
-    uint32_t next_offset;
-
-    /**
-     * Temporary storage for the ZIP archive central directory,
-     * since this part of the file is written at the very end.
-     */
-    std::string central_directory;
-
-    /**
-     * Set containing the full filenames of all files previously
-     * added to the IttyZip archive. Purely used to check for
-     * duplicate files.
-     */
-    std::set<std::string> filenames;
-  };
+  return EXIT_SUCCESS;
 }
-
-#endif /* #ifndef ITTY_ZIP_H_ */
 
 /*
 Creative Commons Legal Code
