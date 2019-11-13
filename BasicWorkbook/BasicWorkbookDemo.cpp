@@ -2,8 +2,8 @@
  * BasicWorkbookDemo.cpp
  * 
  * A simple demonstration of the main capabilities of the BasicWorkbook
- * class. Generates a simple spreadsheet file with all three supported
- * cell types: Numeric value, formula, and string/text value.
+ * class. Generates a workbook file with two sheets, all three supported
+ * cell types, and two different ways of doing cell indexing.
  * 
  * Written in 2019 by Ben Tesch.
  *
@@ -34,7 +34,23 @@ int main()
   sheet1.add_formula_cell("C4", "A4+B4");
 
   BasicWorkbook::Sheet &sheet2 = workbook.addSheet("sheet2");
-  sheet2.add_string_cell("A1", "hi!");
+  sheet2.add_string_cell(1u, 1u, "col 1");
+  sheet2.add_string_cell(1u, 2u, "col 2");
+  sheet2.add_string_cell(1u, 3u, "col 3");
+  
+  for (uint32_t jRow = 2u; jRow <= 101u; jRow++)
+  {
+    sheet2.add_number_cell(jRow, 1u, static_cast<double>(jRow-1u));
+    sheet2.add_number_cell(jRow, 2u, static_cast<double>(jRow));
+    std::string formula = BasicWorkbook::integerref_to_mixedref(jRow, 1u) + "+" +
+      BasicWorkbook::integerref_to_mixedref(jRow, 2u);
+    sheet2.add_formula_cell(jRow, 3u, formula);
+  }
+
+  sheet2.add_string_cell(102u, 2u, "total:");
+  std::string total = "SUM(" + BasicWorkbook::integerref_to_mixedref(2u, 3u) +
+    ":" + BasicWorkbook::integerref_to_mixedref(101u, 3u) + ")";
+  sheet2.add_formula_cell(102u, 3u, total);
 
   workbook.publish();
 

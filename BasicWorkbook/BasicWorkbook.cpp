@@ -1,7 +1,9 @@
 /**
  * BasicWorkbook.cpp
  * 
- * TODO: proper file header.
+ * Definitions for BasicWorkbook, a class that enables the creation of
+ * multi sheet Office Open XML workbook files using only a few methods.
+ * Cells containing numeric values, formulas, and strings are supported.
  * 
  * Written in 2019 by Ben Tesch.
  *
