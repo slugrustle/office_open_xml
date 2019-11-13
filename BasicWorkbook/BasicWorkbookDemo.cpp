@@ -14,11 +14,13 @@
  * end of this file. If not, see http://creativecommons.org/publicdomain/zero/1.0/
  */
 
+#include <cstdio>
 #include "BasicWorkbook.h"
 
 int main()
 {
-  BasicWorkbook::Workbook workbook("test1.xlsx");
+  BasicWorkbook::Workbook workbook;
+
   BasicWorkbook::Sheet &sheet1 = workbook.addSheet("sheet1");
   sheet1.add_string_cell("A1", "col 1");
   sheet1.add_number_cell("A2", 1.0);
@@ -52,7 +54,17 @@ int main()
     ":" + BasicWorkbook::integerref_to_mixedref(101u, 3u) + ")";
   sheet2.add_formula_cell(102u, 3u, total);
 
-  workbook.publish();
+  const char workbook_filename[] = "test1.xlsx";
+
+  try
+  {
+    workbook.publish(workbook_filename);
+  }
+  catch (std::exception &e)
+  {
+    std::printf("Error creating workbook file %s.\n%s\n\n", workbook_filename, e.what());
+    return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }

@@ -147,9 +147,9 @@ namespace BasicWorkbook
   class Workbook
   {
   public:
-    Workbook(const std::string filename) noexcept(false);
+    Workbook(void) noexcept;
     Sheet& addSheet(const std::string &name) noexcept(false);
-    void publish(void) noexcept(false);
+    void publish(const std::string &filename) noexcept(false);
 
   private:
     /**

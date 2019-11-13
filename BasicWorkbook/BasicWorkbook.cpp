@@ -430,12 +430,11 @@ namespace BasicWorkbook
   }
 
   /**
-   * Workbook constructor. filename is the name of the file that
-   * this workbook will be written to, such as Book1.xlsx.
+   * Workbook basic constructor.
    */
-  Workbook::Workbook(const std::string filename) noexcept(false)
+  Workbook::Workbook(void) noexcept
   {
-    archive.open(filename);
+    /* Nothing. */
   }
 
   /**
@@ -463,9 +462,17 @@ namespace BasicWorkbook
     return sheets.back();
   }
 
-  void Workbook::publish(void) noexcept(false)
+  /**
+   * Writes the Workbook contents to the output file specified
+   * by the filename argument and then clears the Workbook.
+   */
+  void Workbook::publish(const std::string &filename) noexcept(false)
   {
     if (sheets.empty()) throw std::exception("publish() called, but Workbook has no Sheets.");
+
+    if (filename.empty()) throw std::invalid_argument("publish() called with empty filename.");
+
+    archive.open(filename);
 
     {
       std::string content_types;
@@ -620,8 +627,12 @@ namespace BasicWorkbook
       archive.addFile("xl/workbook.xml", workbook);
     }
 
-    for (size_t jSheet = 0u; jSheet < sheets.size(); jSheet++)
-      archive.addFile(sheets.at(jSheet).filename, sheets.at(jSheet).generate_file());
+    while (!sheets.empty())
+    {
+      archive.addFile(sheets.back().filename, sheets.back().generate_file());
+      sheets.pop_back();
+    }
+    sheets.clear();
 
     archive.finalize();
   }

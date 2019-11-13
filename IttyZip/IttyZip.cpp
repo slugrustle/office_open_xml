@@ -274,6 +274,7 @@ namespace IttyZip
       next_offset = 0u;
       central_directory.clear();
       num_files = 0u;
+      filenames.clear();
     }
   }
 
