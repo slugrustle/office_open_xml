@@ -36,6 +36,14 @@ namespace BasicWorkbook
   const uint32_t MAX_COL = 16384u;
 
   /**
+   * These minimum and maximum column widths (in characters)
+   * are the same limits as those in a popular office
+   * software suite.
+   */
+  const double MIN_COL_WIDTH = 0.0;
+  const double MAX_COL_WIDTH = 255.0;
+
+  /**
    * This type holds a cell reference as a pair of uint32_t numbers.
    */
   typedef struct
@@ -58,6 +66,72 @@ namespace BasicWorkbook
   };
 
   /**
+   * Number formats supported for NUMBER and FORMULA type cells.
+   * General is the Office Open XML General cell format type
+   * and also the default if another format is not specified.
+   * FIX is for fixed point
+   * SCI is for scientific notation
+   * PCT is for percentage; a 0.1 cell value results in 10%
+   * The number after FIX, SCI, or PCT represents the number
+   * of displayed places to the right of the decimal point.
+   */
+  enum class NumberFormat : uint8_t
+  {
+    GENERAL = 0u,
+    FIX0 = 1u,
+    FIX1 = 2u,
+    FIX2 = 3u,
+    FIX3 = 4u,
+    FIX4 = 5u,
+    FIX5 = 6u,
+    FIX6 = 7u,
+    FIX7 = 8u,
+    FIX8 = 9u,
+    FIX9 = 10u,
+    FIX10 = 11u,
+    FIX11 = 12u,
+    FIX12 = 13u,
+    FIX13 = 14u,
+    FIX14 = 15u,
+    FIX15 = 16u,
+    FIX16 = 17u,
+    SCI0 = 18u,
+    SCI1 = 19u,
+    SCI2 = 20u,
+    SCI3 = 21u,
+    SCI4 = 22u,
+    SCI5 = 23u,
+    SCI6 = 24u,
+    SCI7 = 25u,
+    SCI8 = 26u,
+    SCI9 = 27u,
+    SCI10 = 28u,
+    SCI11 = 29u,
+    SCI12 = 30u,
+    SCI13 = 31u,
+    SCI14 = 32u,
+    SCI15 = 33u,
+    SCI16 = 34u,
+    PCT0 = 35u,
+    PCT1 = 36u,
+    PCT2 = 37u,
+    PCT3 = 38u,
+    PCT4 = 39u,
+    PCT5 = 40u,
+    PCT6 = 41u,
+    PCT7 = 42u,
+    PCT8 = 43u,
+    PCT9 = 44u,
+    PCT10 = 45u,
+    PCT11 = 46u,
+    PCT12 = 47u,
+    PCT13 = 48u,
+    PCT14 = 49u,
+    PCT15 = 50u,
+    PCT16 = 51u
+  };
+
+  /**
    * This is the representation of a single cell in
    * BasicWorkbook. Both formula type cells and
    * string type cells store their value in the
@@ -67,6 +141,7 @@ namespace BasicWorkbook
   {
     integerref_t integerref;
     CellType type;
+    NumberFormat num_format;
     double num_val;
     std::string str_fml_val;
   } cell_t;
@@ -74,6 +149,11 @@ namespace BasicWorkbook
   struct cell_sort_compare
   {
     bool operator() (const cell_t &a, const cell_t &b) const noexcept;
+  };
+
+  struct column_widths_sort_compare
+  {
+    bool operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept;
   };
 
   uint32_t column_to_integer(const std::string &column) noexcept(false);
@@ -86,15 +166,17 @@ namespace BasicWorkbook
   class Sheet
   {
   public:
-    void add_number_cell(const uint32_t row, const uint32_t col, const double number) noexcept(false);
-    void add_number_cell(const integerref_t &integerref, const double number) noexcept(false);
-    void add_number_cell(const std::string &mixedref, const double number) noexcept(false);
-    void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula) noexcept(false);
-    void add_formula_cell(const integerref_t &integerref, const std::string &formula) noexcept(false);
-    void add_formula_cell(const std::string &mixedref, const std::string &formula) noexcept(false);
+    void add_number_cell(const uint32_t row, const uint32_t col, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
+    void add_number_cell(const integerref_t &integerref, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
+    void add_number_cell(const std::string &mixedref, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
+    void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
+    void add_formula_cell(const integerref_t &integerref, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
+    void add_formula_cell(const std::string &mixedref, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
     void add_string_cell(const uint32_t row, const uint32_t col, const std::string &value) noexcept(false);
     void add_string_cell(const integerref_t &integerref, const std::string &value) noexcept(false);
     void add_string_cell(const std::string &mixedref, const std::string &value) noexcept(false);
+    void set_column_width(const uint32_t col, const double width) noexcept(false);
+    void set_column_width(const std::string &column, const double width) noexcept(false);
     std::string get_name(void) const noexcept;
 
   private:
@@ -127,6 +209,20 @@ namespace BasicWorkbook
      * automatically by the Workbook class.
      */
     std::string relId;
+
+    /**
+     * This set stores the indices of columns with one or more
+     * cells so that the width of all non-empty columns can
+     * be set to best fit if not otherwise specified.
+     */
+    std::set<uint32_t> used_columns;
+
+    /**
+     * This set holds any custom column widths.
+     * The column index is the first element of the pair;
+     * the width is the second element of the pair.
+     */
+    std::set<std::pair<uint32_t,double>, column_widths_sort_compare> column_widths;
 
     /**
      * This Sheet's cells are stored in a set so that they are

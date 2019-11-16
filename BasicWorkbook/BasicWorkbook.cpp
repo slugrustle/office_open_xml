@@ -42,6 +42,14 @@ namespace BasicWorkbook
   }
 
   /**
+   * Sort the elements of column_widths purely by column index.
+   */
+  bool column_widths_sort_compare::operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept
+  {
+    return a.first < b.first;
+  }
+
+  /**
    * Convert from a column index expressed as a string
    * A, B, ..., Z, AA, AB, ..., ZZ, AAA, AAB, ...
    * to the equivalent integer index, where A = 1, B = 2,
@@ -63,7 +71,7 @@ namespace BasicWorkbook
     if (!std::isupper(last_char)) throw std::invalid_argument("column_to_integer() received non-alphabetic input character.");
     integer += static_cast<uint32_t>(last_char) - 64u;
 
-    if (integer > MAX_COL) throw std::out_of_range("column_to_integer() received a too large column index.");
+    if (integer > MAX_COL) throw std::invalid_argument("column_to_integer() received a too large column index.");
 
     return integer;
   }
@@ -76,7 +84,7 @@ namespace BasicWorkbook
   std::string integer_to_column(uint32_t integer) noexcept(false)
   {
     if (integer == 0u) throw std::invalid_argument("integer_to_column() received an input of 0.");
-    if (integer > MAX_COL) throw std::out_of_range("integer_to_column() received a too large column index.");
+    if (integer > MAX_COL) throw std::invalid_argument("integer_to_column() received a too large column index.");
     
     std::string column;
 
@@ -212,18 +220,18 @@ namespace BasicWorkbook
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
    */
-  void Sheet::add_number_cell(const uint32_t row, const uint32_t col, const double number) noexcept(false)
+  void Sheet::add_number_cell(const uint32_t row, const uint32_t col, const double number, const NumberFormat num_format) noexcept(false)
   {
     integerref_t integerref;
     integerref.row = row;
     integerref.col = col;
-    this->add_number_cell(integerref, number);
+    this->add_number_cell(integerref, number, num_format);
   }
 
   /**
    * Add a cell with a numeric value to this Sheet at the specified row & column.
    */
-  void Sheet::add_number_cell(const integerref_t &integerref, const double number) noexcept(false)
+  void Sheet::add_number_cell(const integerref_t &integerref, const double number, const NumberFormat num_format) noexcept(false)
   {
     if (integerref.col < 1u || 
         integerref.col > MAX_COL ||
@@ -236,10 +244,12 @@ namespace BasicWorkbook
     cell_t cell = {0};
     cell.integerref = integerref;
     cell.type = CellType::NUMBER;
+    cell.num_format = num_format;
     cell.num_val = number;
     
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
     if (!insret.second) throw std::exception("add_number_cell() encountered duplicate insertion of a cell at the same reference.");
+    used_columns.insert(integerref.col);
   }
 
   /**
@@ -247,10 +257,10 @@ namespace BasicWorkbook
    * The caller may prefer to use mixedref format, especially if they are working
    * with formulas. This interface is provided to support that.
    */
-  void Sheet::add_number_cell(const std::string &mixedref, const double number) noexcept(false)
+  void Sheet::add_number_cell(const std::string &mixedref, const double number, const NumberFormat num_format) noexcept(false)
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
-    this->add_number_cell(integerref, number);
+    this->add_number_cell(integerref, number, num_format);
   }
 
   /**
@@ -258,18 +268,18 @@ namespace BasicWorkbook
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
    */
-  void Sheet::add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula) noexcept(false)
+  void Sheet::add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const NumberFormat num_format) noexcept(false)
   {
     integerref_t integerref;
     integerref.row = row;
     integerref.col = col;
-    this->add_formula_cell(integerref, formula);
+    this->add_formula_cell(integerref, formula, num_format);
   }
 
   /**
    * Add a cell with a formula to this Sheet at the specified row & column.
    */
-  void Sheet::add_formula_cell(const integerref_t &integerref, const std::string &formula) noexcept(false)
+  void Sheet::add_formula_cell(const integerref_t &integerref, const std::string &formula, const NumberFormat num_format) noexcept(false)
   {
     if (integerref.col < 1u || 
         integerref.col > MAX_COL ||
@@ -282,11 +292,13 @@ namespace BasicWorkbook
     cell_t cell = {0};
     cell.integerref = integerref;
     cell.type = CellType::FORMULA;
+    cell.num_format = num_format;
     cell.str_fml_val = formula;
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
     if (!insret.second) throw std::exception("add_formula_cell() encountered duplicate insertion of a cell at the same reference.");
+    used_columns.insert(integerref.col);
   }
 
   /**
@@ -294,10 +306,10 @@ namespace BasicWorkbook
    * The caller may prefer to use mixedref format, especially if they are working
    * with formulas. This interface is provided to support that.
    */
-  void Sheet::add_formula_cell(const std::string &mixedref, const std::string &formula) noexcept(false)
+  void Sheet::add_formula_cell(const std::string &mixedref, const std::string &formula, const NumberFormat num_format) noexcept(false)
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
-    this->add_formula_cell(integerref, formula);
+    this->add_formula_cell(integerref, formula, num_format);
   }
 
   /**
@@ -334,6 +346,7 @@ namespace BasicWorkbook
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
     if (!insret.second) throw std::exception("add_string_cell() encountered duplicate insertion of a cell at the same reference.");
+    used_columns.insert(integerref.col);
   }
 
 
@@ -346,6 +359,33 @@ namespace BasicWorkbook
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
     this->add_string_cell(integerref, value);
+  }
+
+  /**
+   * Set the width of the indicated column in terms of number of characters
+   * of the width of the widest digit character (0, 1, ..., 9) in the present
+   * font. The ECMA376 standard has equations to accurately scale this value
+   * to account for the 5 pixel padding in the column.
+   *
+   * This value is only actually applied to columns that have at least one
+   * non-empty cell.
+   */
+  void Sheet::set_column_width(const uint32_t col, const double width) noexcept(false)
+  {
+    if (width < MIN_COL_WIDTH || width > MAX_COL_WIDTH) throw std::invalid_argument("set_column_width received invalid width argument.");
+    if (col < 1u || col > MAX_COL) throw std::invalid_argument("set_column_width received invalid col argument.");
+
+    column_widths.insert(std::make_pair(col, width));
+  }
+
+  /**
+   * Alternative option for set_column_width that accepts the column index
+   * in the format A, B, ..., Z, AA, AB, ...
+   */
+  void Sheet::set_column_width(const std::string &column, const double width) noexcept(false)
+  {
+    uint32_t col = column_to_integer(column);
+    this->set_column_width(col, width);
   }
 
   /**
@@ -382,6 +422,19 @@ namespace BasicWorkbook
     file += u8"<sheetViews><sheetView workbookViewId=\"0\"/></sheetViews>";
     file += u8"<sheetFormatPr defaultRowHeight=\"17\"/>";
     
+    file += u8"<cols>";
+    for (std::set<uint32_t>::const_iterator used_col_itr = used_columns.cbegin();
+         used_col_itr != used_columns.cend();
+         used_col_itr++)
+    {
+      std::string colnum = std::to_string(*used_col_itr);
+      std::pair<uint32_t, double> cold_widths_key = std::make_pair(*used_col_itr, 0.0);
+      std::set<std::pair<uint32_t, double> >::iterator col_widths_itr = column_widths.find(cold_widths_key);
+      if (col_widths_itr != column_widths.end()) file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"" + std::to_string(col_widths_itr->second) + "\" customWidth=\"1\"/>";
+      else file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"9.005\" bestFit=\"1\"/>";
+    }
+    file += u8"</cols>";
+
     if (cells.empty())
     {
       file += u8"<sheetData/>";
@@ -408,17 +461,25 @@ namespace BasicWorkbook
 
         if (this_cell.type == CellType::NUMBER)
         {
-          file += u8"<c r=\"" + mixedref + "\">";
-          file += u8"<v>" + std::to_string(this_cell.num_val) + "</v></c>";
+          file += u8"<c r=\"" + mixedref + "\"";
+          
+          if (this_cell.num_format != NumberFormat::GENERAL)
+            file += u8" s=\"" + std::to_string(static_cast<uint8_t>(this_cell.num_format)) + "\"";
+
+          file += u8"><v>" + std::to_string(this_cell.num_val) + "</v></c>";
         }
         else if (this_cell.type == CellType::FORMULA)
         {
-          file += u8"<c r=\"" + mixedref + "\">";
-          file += u8"<f>" + this_cell.str_fml_val + "</f></c>";
+          file += u8"<c r=\"" + mixedref + "\"";
+
+          if (this_cell.num_format != NumberFormat::GENERAL)
+            file += u8" s=\"" + std::to_string(static_cast<uint8_t>(this_cell.num_format)) + "\"";
+
+          file += u8"><f>" + this_cell.str_fml_val + "</f></c>";
         }
         else
         {
-          file += u8"<c r=\"" + mixedref + "\" t=\"inlineStr\">";
+          file += u8"<c r=\"" + mixedref + "\" s=\"52\" t=\"inlineStr\">";
           file += u8"<is><t>" + this_cell.str_fml_val + "</t></is></c>";
         }
       }
@@ -576,6 +637,59 @@ namespace BasicWorkbook
       std::string styles;
       styles += u8"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
       styles += u8"<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">";
+      styles += u8"<numFmts count=\"51\">";
+      styles += u8"<numFmt numFmtId=\"100\" formatCode=\"0\"/>";
+      styles += u8"<numFmt numFmtId=\"101\" formatCode=\"0.0\"/>";
+      styles += u8"<numFmt numFmtId=\"102\" formatCode=\"0.00\"/>";
+      styles += u8"<numFmt numFmtId=\"103\" formatCode=\"0.000\"/>";
+      styles += u8"<numFmt numFmtId=\"104\" formatCode=\"0.0000\"/>";
+      styles += u8"<numFmt numFmtId=\"105\" formatCode=\"0.00000\"/>";
+      styles += u8"<numFmt numFmtId=\"106\" formatCode=\"0.000000\"/>";
+      styles += u8"<numFmt numFmtId=\"107\" formatCode=\"0.0000000\"/>";
+      styles += u8"<numFmt numFmtId=\"108\" formatCode=\"0.00000000\"/>";
+      styles += u8"<numFmt numFmtId=\"109\" formatCode=\"0.000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"110\" formatCode=\"0.0000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"111\" formatCode=\"0.00000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"112\" formatCode=\"0.000000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"113\" formatCode=\"0.0000000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"114\" formatCode=\"0.00000000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"115\" formatCode=\"0.000000000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"116\" formatCode=\"0.0000000000000000\"/>";
+      styles += u8"<numFmt numFmtId=\"117\" formatCode=\"0E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"118\" formatCode=\"0.0E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"119\" formatCode=\"0.00E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"120\" formatCode=\"0.000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"121\" formatCode=\"0.0000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"122\" formatCode=\"0.00000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"123\" formatCode=\"0.000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"124\" formatCode=\"0.0000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"125\" formatCode=\"0.00000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"126\" formatCode=\"0.000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"127\" formatCode=\"0.0000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"128\" formatCode=\"0.00000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"129\" formatCode=\"0.000000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"130\" formatCode=\"0.0000000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"131\" formatCode=\"0.00000000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"132\" formatCode=\"0.000000000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"133\" formatCode=\"0.0000000000000000E+0\"/>";
+      styles += u8"<numFmt numFmtId=\"134\" formatCode=\"0%\"/>";
+      styles += u8"<numFmt numFmtId=\"135\" formatCode=\"0.0%\"/>";
+      styles += u8"<numFmt numFmtId=\"136\" formatCode=\"0.00%\"/>";
+      styles += u8"<numFmt numFmtId=\"137\" formatCode=\"0.000%\"/>";
+      styles += u8"<numFmt numFmtId=\"138\" formatCode=\"0.0000%\"/>";
+      styles += u8"<numFmt numFmtId=\"139\" formatCode=\"0.00000%\"/>";
+      styles += u8"<numFmt numFmtId=\"140\" formatCode=\"0.000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"141\" formatCode=\"0.0000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"142\" formatCode=\"0.00000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"143\" formatCode=\"0.000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"144\" formatCode=\"0.0000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"145\" formatCode=\"0.00000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"146\" formatCode=\"0.000000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"147\" formatCode=\"0.0000000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"148\" formatCode=\"0.00000000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"149\" formatCode=\"0.000000000000000%\"/>";
+      styles += u8"<numFmt numFmtId=\"150\" formatCode=\"0.0000000000000000%\"/>";
+      styles += u8"</numFmts>";
       styles += u8"<fonts count=\"1\"><font>";
       styles += u8"<sz val=\"12\"/>";
       styles += u8"<color rgb=\"FF000000\"/>";
@@ -592,8 +706,60 @@ namespace BasicWorkbook
       styles += u8"<cellStyleXfs count=\"1\">";
       styles += u8"<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>";
       styles += u8"</cellStyleXfs>";
-      styles += u8"<cellXfs count=\"1\">";
-      styles += u8"<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>";
+      styles += u8"<cellXfs count=\"53\">";
+      styles += u8"<xf numFmtId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"100\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"101\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"102\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"103\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"104\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"105\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"106\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"107\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"108\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"109\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"110\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"111\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"112\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"113\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"114\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"115\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"116\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"117\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"118\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"119\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"120\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"121\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"122\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"123\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"124\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"125\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"126\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"127\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"128\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"129\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"130\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"131\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"132\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"133\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"134\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"135\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"136\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"137\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"138\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"139\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"140\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"141\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"142\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"143\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"144\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"145\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"146\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"147\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"148\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"149\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"150\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<xf numFmtId=\"49\" xfId=\"0\" applyNumberFormat=\"1\"/>";
       styles += u8"</cellXfs>";
       styles += u8"<cellStyles count=\"1\">";
       styles += u8"<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>";
