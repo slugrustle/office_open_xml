@@ -6,6 +6,7 @@
  * Cells containing numeric values, formulas, and strings are supported.
  * 
  * Written in 2019 by Ben Tesch.
+ * Originally distributed at https://github.com/slugrustle/office_open_xml
  *
  * To the extent possible under law, the author has dedicated all copyright
  * and related and neighboring rights to this software to the public domain
@@ -290,6 +291,90 @@ namespace BasicWorkbook
   }
 
   /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied numeric value in this merged cell.
+   * integerref_t is a little inconvenient for the caller, so this interface is
+   * provided to make things easier.
+   */
+  void Sheet::add_merged_number_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const double number, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t start_ref;
+    start_ref.row = start_row;
+    start_ref.col = start_col;
+
+    integerref_t end_ref;
+    end_ref.row = end_row;
+    end_ref.col = end_col;
+
+    this->add_merged_number_cell(start_ref, end_ref, number, cell_style);
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied numeric value in this merged cell.
+   */
+  void Sheet::add_merged_number_cell(const integerref_t &start_ref, const integerref_t &end_ref, const double number, const cell_style_t &cell_style) noexcept(false)
+  {
+    if (start_ref.col < 1u || 
+        start_ref.col > MAX_COL ||
+        start_ref.row < 1u ||
+        start_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_number_cell() received an invalid starting cell reference."));
+    }
+
+    if (end_ref.col < 1u || 
+        end_ref.col > MAX_COL ||
+        end_ref.row < 1u ||
+        end_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_number_cell() received an invalid ending cell reference."));
+    }
+
+    if (start_ref.col > end_ref.col || 
+        start_ref.row > end_ref.row ||
+        (start_ref.col == end_ref.col &&
+         start_ref.row == end_ref.row))
+    {
+      throw std::invalid_argument(std::string("add_merged_number_cell() received an ending cell reference equal or prior to its starting cell reference."));
+    }
+
+    this->add_number_cell(start_ref, number, cell_style);
+
+    for (uint32_t jRow = start_ref.row; jRow <= end_ref.row; jRow++)
+    {
+      for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
+      {
+        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+
+        integerref_t this_ref;
+        this_ref.row = jRow;
+        this_ref.col = jCol;
+        this->add_empty_cell(this_ref, cell_style);
+      }
+    }
+
+    merged_cell_t this_merge;
+    this_merge.start_ref = start_ref;
+    this_merge.end_ref = end_ref;
+    merged_cells.insert(std::move(this_merge));
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied numeric value in this merged cell.
+   * The caller may prefer to use mixedref format, especially if they are working
+   * with formulas. This interface is provided to support that.
+   */
+  void Sheet::add_merged_number_cell(const std::string &start_ref, const std::string &end_ref, const double number, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t int_start_ref = mixedref_to_integerref(start_ref);
+    integerref_t int_end_ref = mixedref_to_integerref(end_ref);
+
+    this->add_merged_number_cell(int_start_ref, int_end_ref, number, cell_style);
+  }
+
+  /**
    * Add a cell with a formula to this Sheet at the specified row & column.
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
@@ -312,7 +397,12 @@ namespace BasicWorkbook
         integerref.row < 1u ||
         integerref.row > MAX_ROW)
     {
-      throw std::invalid_argument("add_formula_cell() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("add_formula_cell() received an invalid cell reference."));
+    }
+
+    if (formula.length() > MAX_FORMULA_LEN)
+    {
+      throw std::invalid_argument(std::string("the formula supplied to add_formula_cell() is too long."));
     }
 
     cell_t cell = {0};
@@ -339,6 +429,90 @@ namespace BasicWorkbook
   }
 
   /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied formula in this merged cell.
+   * integerref_t is a little inconvenient for the caller, so this interface is
+   * provided to make things easier.
+   */
+  void Sheet::add_merged_formula_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t start_ref;
+    start_ref.row = start_row;
+    start_ref.col = start_col;
+
+    integerref_t end_ref;
+    end_ref.row = end_row;
+    end_ref.col = end_col;
+
+    this->add_merged_formula_cell(start_ref, end_ref, formula, cell_style);
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied formula in this merged cell.
+   */
+  void Sheet::add_merged_formula_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
+  {
+    if (start_ref.col < 1u || 
+        start_ref.col > MAX_COL ||
+        start_ref.row < 1u ||
+        start_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_formula_cell() received an invalid starting cell reference."));
+    }
+
+    if (end_ref.col < 1u || 
+        end_ref.col > MAX_COL ||
+        end_ref.row < 1u ||
+        end_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_formula_cell() received an invalid ending cell reference."));
+    }
+
+    if (start_ref.col > end_ref.col || 
+        start_ref.row > end_ref.row ||
+        (start_ref.col == end_ref.col &&
+         start_ref.row == end_ref.row))
+    {
+      throw std::invalid_argument(std::string("add_merged_formula_cell() received an ending cell reference equal or prior to its starting cell reference."));
+    }
+
+    this->add_formula_cell(start_ref, formula, cell_style);
+
+    for (uint32_t jRow = start_ref.row; jRow <= end_ref.row; jRow++)
+    {
+      for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
+      {
+        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+
+        integerref_t this_ref;
+        this_ref.row = jRow;
+        this_ref.col = jCol;
+        this->add_empty_cell(this_ref, cell_style);
+      }
+    }
+
+    merged_cell_t this_merge;
+    this_merge.start_ref = start_ref;
+    this_merge.end_ref = end_ref;
+    merged_cells.insert(std::move(this_merge));
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the supplied formula in this merged cell.
+   * The caller may prefer to use mixedref format, especially if they are working
+   * with formulas. This interface is provided to support that.
+   */
+  void Sheet::add_merged_formula_cell(const std::string &start_ref, const std::string &end_ref, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t int_start_ref = mixedref_to_integerref(start_ref);
+    integerref_t int_end_ref = mixedref_to_integerref(end_ref);
+
+    this->add_merged_formula_cell(int_start_ref, int_end_ref, formula, cell_style);
+  }
+
+  /**
    * Add a cell with a string value to this Sheet at the specified row & column.
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
@@ -362,6 +536,16 @@ namespace BasicWorkbook
         integerref.row > MAX_ROW)
     {
       throw std::invalid_argument(std::string("add_string_cell() received an invalid cell reference."));
+    }
+
+    if (value.length() > MAX_STRING_LEN)
+    {
+      throw std::invalid_argument(std::string("the string value supplied to add_string_cell() is too long."));
+    }
+
+    if (std::count(value.begin(), value.end(), '\n') > MAX_STRING_LINE_BREAKS)
+    {
+      throw std::invalid_argument(std::string("the string value supplied to add_string_cell() contains too many line breaks."));
     }
 
     cell_t cell = {0};

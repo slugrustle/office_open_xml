@@ -6,6 +6,7 @@
  * foregoing compression.
  * 
  * Written in 2019 by Ben Tesch.
+ * Originally distributed at https://github.com/slugrustle/office_open_xml
  *
  * To the extent possible under law, the author has dedicated all copyright
  * and related and neighboring rights to this software to the public domain

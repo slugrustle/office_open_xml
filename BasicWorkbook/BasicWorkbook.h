@@ -7,6 +7,7 @@
  * strings are supported.
  * 
  * Written in 2019 by Ben Tesch.
+ * Originally distributed at https://github.com/slugrustle/office_open_xml
  *
  * To the extent possible under law, the author has dedicated all copyright
  * and related and neighboring rights to this software to the public domain
@@ -42,6 +43,19 @@ namespace BasicWorkbook
    */
   const double MIN_COL_WIDTH = 0.0;
   const double MAX_COL_WIDTH = 255.0;
+
+  /**
+   * These are the maximum lengths (in characters) of strings
+   * and formulas in a popular office software suite.
+   */
+  const uint32_t MAX_STRING_LEN = 32767u;
+  const uint32_t MAX_FORMULA_LEN = 8192u;
+
+  /**
+   * This is the maximum number of line breaks in a single
+   * cell in a popular office software suite.
+   */
+  const uint32_t MAX_STRING_LINE_BREAKS = 253u;
 
   /**
    * This type holds a cell reference as a pair of uint32_t numbers.
@@ -231,15 +245,15 @@ namespace BasicWorkbook
     void add_number_cell(const uint32_t row, const uint32_t col, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_number_cell(const integerref_t &integerref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_number_cell(const std::string &mixedref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_number_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_number_cell(const integerref_t &start_ref, const integerref_t &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_number_cell(const std::string &start_ref, const std::string &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_number_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_number_cell(const integerref_t &start_ref, const integerref_t &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_number_cell(const std::string &start_ref, const std::string &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_formula_cell(const integerref_t &integerref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_formula_cell(const std::string &mixedref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_formula_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_formula_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
-    //void add_merged_formula_cell(const std::string &start_ref, const std::string &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_formula_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_formula_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_merged_formula_cell(const std::string &start_ref, const std::string &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
     void add_string_cell(const uint32_t row, const uint32_t col, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
     void add_string_cell(const integerref_t &integerref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
     void add_string_cell(const std::string &mixedref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
