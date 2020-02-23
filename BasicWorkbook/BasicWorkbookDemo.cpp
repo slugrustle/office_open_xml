@@ -23,19 +23,26 @@ int main()
   BasicWorkbook::Workbook workbook;
 
   BasicWorkbook::Sheet &sheet1 = workbook.addSheet("sheet1");
+  BasicWorkbook::cell_style_t topleft_wrap_style = {BasicWorkbook::NumberFormat::TEXT, BasicWorkbook::HorizontalAlignment::LEFT, BasicWorkbook::VerticalAlignment::TOP, true, false};
+  std::string explainer = "This workbook demonstrates some of the features of BasicWorkbook. ";
+  explainer += "For example, this cell demonstrates wrapped text in a merged cell with top left alignment ";
+  explainer += "and a custom row height.";
+  sheet1.add_merged_string_cell("A1", "F1", explainer, topleft_wrap_style);
+  sheet1.set_row_height(1, 68.0);
+
   BasicWorkbook::cell_style_t center_bold_style = {BasicWorkbook::NumberFormat::TEXT, BasicWorkbook::HorizontalAlignment::CENTER, BasicWorkbook::VerticalAlignment::BOTTOM, false, true};
-  sheet1.add_string_cell("A1", "col 1", center_bold_style);
-  sheet1.add_number_cell("A2", 1.0);
-  sheet1.add_number_cell("A3", 2.0);
-  sheet1.add_number_cell("A4", 3.0);
-  sheet1.add_string_cell("B1", "col 2", center_bold_style);
-  sheet1.add_number_cell("B2", 4.0);
-  sheet1.add_number_cell("B3", 5.0);
-  sheet1.add_number_cell("B4", 6.0);
-  sheet1.add_string_cell("C1", "col 3", center_bold_style);
-  sheet1.add_formula_cell("C2", "A2+B2");
+  sheet1.add_string_cell("A2", "col 1", center_bold_style);
+  sheet1.add_number_cell("A3", 1.0);
+  sheet1.add_number_cell("A4", 2.0);
+  sheet1.add_number_cell("A5", 3.0);
+  sheet1.add_string_cell("B2", "col 2", center_bold_style);
+  sheet1.add_number_cell("B3", 4.0);
+  sheet1.add_number_cell("B4", 5.0);
+  sheet1.add_number_cell("B5", 6.0);
+  sheet1.add_string_cell("C2", "col 3", center_bold_style);
   sheet1.add_formula_cell("C3", "A3+B3");
   sheet1.add_formula_cell("C4", "A4+B4");
+  sheet1.add_formula_cell("C5", "A5+B5");
 
   BasicWorkbook::Sheet &sheet2 = workbook.addSheet("sheet2");
   sheet2.add_string_cell(1u, 1u, "col 1", center_bold_style);

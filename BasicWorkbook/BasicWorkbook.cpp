@@ -39,7 +39,11 @@ namespace BasicWorkbook
   {
     if (a.integerref.row < b.integerref.row ||
         (a.integerref.row == b.integerref.row && 
-         a.integerref.col < b.integerref.col)) return true;
+         a.integerref.col < b.integerref.col))
+    {
+      return true;
+    }
+
     return false;
   }
 
@@ -51,7 +55,11 @@ namespace BasicWorkbook
   {
     if (a.start_ref.row < b.start_ref.row ||
         (a.start_ref.row == b.start_ref.row && 
-         a.start_ref.col < b.start_ref.col)) return true;
+         a.start_ref.col < b.start_ref.col))
+    {
+      return true;
+    }
+
     return false;
   }
 
@@ -59,6 +67,14 @@ namespace BasicWorkbook
    * Sort the elements of column_widths purely by column index.
    */
   bool column_widths_sort_compare::operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept
+  {
+    return a.first < b.first;
+  }
+
+  /**
+   * Sort the elements of row_heights purely by row index.
+   */
+  bool row_heights_sort_compare::operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept
   {
     return a.first < b.first;
   }
@@ -84,21 +100,37 @@ namespace BasicWorkbook
    */
   uint32_t column_to_integer(const std::string &column) noexcept(false)
   {
-    if (column.empty()) throw std::invalid_argument(std::string("column_to_integer() received empty input string."));
+    if (column.empty())
+    {
+      throw std::invalid_argument(std::string("column_to_integer() received empty input string."));
+    }
 
     uint32_t integer = 0u;
     for (size_t jChar = 0u; jChar < column.size()-1u; jChar++)
     {
       char this_char = static_cast<char>(std::toupper(column.at(jChar)));
-      if (!std::isupper(this_char)) throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
+      
+      if (!std::isupper(this_char))
+      {
+        throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
+      }
+      
       integer = 26u * (integer + static_cast<uint32_t>(this_char) - 64u);
     }
 
     char last_char = static_cast<char>(std::toupper(column.at(column.size()-1u)));
-    if (!std::isupper(last_char)) throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
+    
+    if (!std::isupper(last_char))
+    {
+      throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
+    }
+
     integer += static_cast<uint32_t>(last_char) - 64u;
 
-    if (integer > MAX_COL) throw std::invalid_argument(std::string("column_to_integer() received a too large column index."));
+    if (integer > MAX_COL)
+    {
+      throw std::invalid_argument(std::string("column_to_integer() received a too large column index."));
+    }
 
     return integer;
   }
@@ -110,8 +142,15 @@ namespace BasicWorkbook
    */
   std::string integer_to_column(uint32_t integer) noexcept(false)
   {
-    if (integer == 0u) throw std::invalid_argument(std::string("integer_to_column() received an input of 0."));
-    if (integer > MAX_COL) throw std::invalid_argument(std::string("integer_to_column() received a too large column index."));
+    if (integer == 0u)
+    {
+      throw std::invalid_argument(std::string("integer_to_column() received an input of 0."));
+    }
+
+    if (integer > MAX_COL)
+    {
+      throw std::invalid_argument(std::string("integer_to_column() received a too large column index."));
+    }
     
     std::string column;
 
@@ -120,8 +159,15 @@ namespace BasicWorkbook
       uint32_t remainder = integer % 26u;
       integer--;
       integer /= 26u;
-      if (remainder == 0u) column.insert(0u, 1u, 'Z');
-      else column.insert(0u, 1u, static_cast<char>(remainder + 64u));
+
+      if (remainder == 0u)
+      {
+        column.insert(0u, 1u, 'Z');
+      }
+      else
+      {
+        column.insert(0u, 1u, static_cast<char>(remainder + 64u));
+      }
     }
 
     return column;
@@ -144,12 +190,23 @@ namespace BasicWorkbook
       if (std::isalpha(this_char))
       {
         found_first_alpha = true;
-        if (found_first_decimal) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
+        if (found_first_decimal)
+        {
+          throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
+        }
       }
       else if (std::isdigit(this_char))
       {
-        if (!found_first_alpha) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
-        if (!found_first_decimal) row_start = jChar;
+        if (!found_first_alpha)
+        {
+          throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
+        }
+
+        if (!found_first_decimal)
+        {
+          row_start = jChar;
+        }
+
         found_first_decimal = true;
       }
       else
@@ -158,7 +215,10 @@ namespace BasicWorkbook
       }
     }
 
-    if (!found_first_alpha || !found_first_decimal) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
+    if (!found_first_alpha || !found_first_decimal)
+    {
+      throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
+    }
 
     std::string column_str = mixedref.substr(0u, row_start);
     integerref_t integerref;
@@ -232,11 +292,17 @@ namespace BasicWorkbook
   */
   bool case_insensitive_same(const std::string &a, const std::string &b) noexcept
   {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size())
+    {
+      return false;
+    }
 
     for (size_t jChar = 0u; jChar < a.size(); jChar++)
     {
-      if (std::tolower(a.at(jChar)) != std::tolower(b.at(jChar))) return false;
+      if (std::tolower(a.at(jChar)) != std::tolower(b.at(jChar)))
+      {
+        return false;
+      }
     }
 
     return true;
@@ -275,7 +341,10 @@ namespace BasicWorkbook
     cell.num_val = number;
     
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::runtime_error(std::string("add_number_cell() encountered duplicate insertion of a cell at the same reference."));
+    if (!insret.second)
+    {
+      throw std::runtime_error(std::string("add_number_cell() encountered duplicate insertion of a cell at the same reference."));
+    }
     used_columns.insert(integerref.col);
   }
 
@@ -345,7 +414,10 @@ namespace BasicWorkbook
     {
       for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
       {
-        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+        if (jRow == start_ref.row && jCol == start_ref.col)
+        {
+          continue;
+        }
 
         integerref_t this_ref;
         this_ref.row = jRow;
@@ -413,7 +485,10 @@ namespace BasicWorkbook
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::runtime_error(std::string("add_formula_cell() encountered duplicate insertion of a cell at the same reference."));
+    if (!insret.second)
+    {
+      throw std::runtime_error(std::string("add_formula_cell() encountered duplicate insertion of a cell at the same reference."));
+    }
     used_columns.insert(integerref.col);
   }
 
@@ -483,7 +558,10 @@ namespace BasicWorkbook
     {
       for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
       {
-        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+        if (jRow == start_ref.row && jCol == start_ref.col)
+        {
+          continue;
+        }
 
         integerref_t this_ref;
         this_ref.row = jRow;
@@ -556,7 +634,10 @@ namespace BasicWorkbook
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::runtime_error(std::string("add_string_cell() encountered duplicate insertion of a cell at the same reference."));
+    if (!insret.second)
+    {
+      throw std::runtime_error(std::string("add_string_cell() encountered duplicate insertion of a cell at the same reference."));
+    }
     used_columns.insert(integerref.col);
   }
 
@@ -626,7 +707,10 @@ namespace BasicWorkbook
     {
       for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
       {
-        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+        if (jRow == start_ref.row && jCol == start_ref.col)
+        {
+          continue;
+        }
 
         integerref_t this_ref;
         this_ref.row = jRow;
@@ -666,8 +750,15 @@ namespace BasicWorkbook
    */
   void Sheet::set_column_width(const uint32_t col, const double width) noexcept(false)
   {
-    if (width < MIN_COL_WIDTH || width > MAX_COL_WIDTH) throw std::invalid_argument(std::string("set_column_width received invalid width argument."));
-    if (col < 1u || col > MAX_COL) throw std::invalid_argument(std::string("set_column_width received invalid col argument."));
+    if (width < MIN_COL_WIDTH || width > MAX_COL_WIDTH)
+    {
+      throw std::invalid_argument(std::string("set_column_width() received invalid width argument."));
+    }
+
+    if (col < 1u || col > MAX_COL)
+    {
+      throw std::invalid_argument(std::string("set_column_width() received invalid col argument."));
+    }
 
     column_widths.insert(std::make_pair(col, width));
   }
@@ -680,6 +771,27 @@ namespace BasicWorkbook
   {
     uint32_t col = column_to_integer(column);
     this->set_column_width(col, width);
+  }
+
+  /**
+   * Set the heights of the indicated row in points.
+   *
+   * This value is only actually applied to columns that have at least one
+   * non-empty cell.
+   */
+  void Sheet::set_row_height(const uint32_t row, const double height) noexcept(false)
+  {
+    if (height < MIN_ROW_HEIGHT || height > MAX_ROW_HEIGHT)
+    {
+      throw std::invalid_argument(std::string("set_row_height() received invalid height argument."));
+    }
+
+    if (row < 1u || row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("set_row_height() received invalid row argument."));
+    }
+
+    row_heights.insert(std::make_pair(row, height));
   }
 
   /**
@@ -699,7 +811,7 @@ namespace BasicWorkbook
    * popular office software suite.
    */
   Sheet::Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_, Workbook &workbook_) noexcept(false) :
-    name(name_), filename(filename_), sheetId(sheetId_), relId(relId_), workbook(workbook_)
+    workbook(workbook_), name(name_), filename(filename_), sheetId(sheetId_), relId(relId_)
   {
     /* Nothing. */
   }
@@ -726,7 +838,10 @@ namespace BasicWorkbook
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::runtime_error(std::string("add_empty_cell() encountered duplicate insertion of a cell at the same reference."));
+    if (!insret.second)
+    {
+      throw std::runtime_error(std::string("add_empty_cell() encountered duplicate insertion of a cell at the same reference."));
+    }
     used_columns.insert(integerref.col);
   }
 
@@ -750,8 +865,14 @@ namespace BasicWorkbook
       std::string colnum = std::to_string(*used_col_itr);
       std::pair<uint32_t, double> cold_widths_key = std::make_pair(*used_col_itr, 0.0);
       std::set<std::pair<uint32_t, double> >::iterator col_widths_itr = column_widths.find(cold_widths_key);
-      if (col_widths_itr != column_widths.end()) file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"" + std::to_string(col_widths_itr->second) + "\" customWidth=\"1\"/>";
-      else file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"9.005\" bestFit=\"1\"/>";
+      if (col_widths_itr != column_widths.end())
+      {
+        file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"" + std::to_string(col_widths_itr->second) + "\" customWidth=\"1\"/>";
+      }
+      else
+      {
+        file += u8"<col min=\"" + colnum + "\" max=\"" + colnum + "\" width=\"9.005\" bestFit=\"1\"/>";
+      }
     }
     file += u8"</cols>";
 
@@ -772,9 +893,21 @@ namespace BasicWorkbook
         
         if (this_cell.integerref.row > this_row)
         {
-          if (this_row > 0u) file += u8"</row>";
+          if (this_row > 0u)
+          {
+            file += u8"</row>";
+          }
           this_row = this_cell.integerref.row;
-          file += u8"<row r=\"" + std::to_string(this_row) + "\">";
+          file += u8"<row r=\"" + std::to_string(this_row) + "\"";
+          
+          std::pair<uint32_t, double> row_heights_key = std::make_pair(this_row, 0.0);
+          std::set<std::pair<uint32_t, double> >::iterator row_heights_itr = row_heights.find(row_heights_key);
+          if (row_heights_itr != row_heights.end())
+          {
+            file += " ht=\"" + std::to_string(row_heights_itr->second) + "\" customHeight=\"1\"";
+          }
+
+          file += u8">";
         }
         
         std::string mixedref = integerref_to_mixedref(this_cell.integerref);
@@ -847,11 +980,17 @@ namespace BasicWorkbook
    */
   Sheet& Workbook::addSheet(const std::string &name) noexcept(false)
   {
-    if (name.empty()) throw std::invalid_argument(std::string("addsheet() received an empty name for a new sheet."));
+    if (name.empty())
+    {
+      throw std::invalid_argument(std::string("addsheet() received an empty name for a new sheet."));
+    }
 
     for (size_t jSheet = 0u; jSheet < sheets.size(); jSheet++)
     {
-      if (case_insensitive_same(name, sheets.at(jSheet).get_name())) throw std::runtime_error(std::string("addSheet() received a new sheet with the same name as an existing sheet."));
+      if (case_insensitive_same(name, sheets.at(jSheet).get_name()))
+      {
+        throw std::runtime_error(std::string("addSheet() received a new sheet with the same name as an existing sheet."));
+      }
     }
 
     uint32_t sheetId = static_cast<uint32_t>(sheets.size() + 1u);
@@ -885,9 +1024,15 @@ namespace BasicWorkbook
    */
   void Workbook::publish(const std::string &filename) noexcept(false)
   {
-    if (sheets.empty()) throw std::runtime_error(std::string("publish() called, but Workbook has no Sheets."));
+    if (sheets.empty())
+    {
+      throw std::runtime_error(std::string("publish() called, but Workbook has no Sheets."));
+    }
 
-    if (filename.empty()) throw std::invalid_argument(std::string("publish() called with empty filename."));
+    if (filename.empty())
+    {
+      throw std::invalid_argument(std::string("publish() called with empty filename."));
+    }
 
     archive.open(filename);
 
@@ -900,7 +1045,9 @@ namespace BasicWorkbook
       content_types += u8"<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>";
     
       for (size_t jSheet = 0u; jSheet < sheets.size(); jSheet++)
+      {
         content_types += u8"<Override PartName=\"/" + sheets.at(jSheet).filename + "\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>";
+      }
 
       content_types += u8"<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>";
       content_types += u8"<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>";
@@ -938,7 +1085,9 @@ namespace BasicWorkbook
       app += u8"<vt:vector size=\"" + std::to_string(sheets.size()) + "\" baseType=\"lpstr\">";
 
       for (size_t jSheet = 0u; jSheet < sheets.size(); jSheet++)
+      {
         app += u8"<vt:lpstr>" + sheets.at(jSheet).name + "</vt:lpstr>";
+      }
 
       app += u8"</vt:vector>";
       app += u8"</TitlesOfParts>";
@@ -961,7 +1110,10 @@ namespace BasicWorkbook
       const size_t TIME_BUF_SIZE = 22u;
       char timestamp[TIME_BUF_SIZE];
       size_t retval = strftime(timestamp, TIME_BUF_SIZE, "%Y-%m-%dT%H:%M:%SZ", &timestruct);
-      if (retval == 0u) throw std::length_error(std::string("Could not assemble timestamp string for core.xml in publish()."));
+      if (retval == 0u)
+      {
+        throw std::length_error(std::string("Could not assemble timestamp string for core.xml in publish()."));
+      }
       std::string time_string(timestamp);
 
       core += u8"<dcterms:created xsi:type=\"dcterms:W3CDTF\">" + time_string + "</dcterms:created>";

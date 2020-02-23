@@ -45,6 +45,14 @@ namespace BasicWorkbook
   const double MAX_COL_WIDTH = 255.0;
 
   /**
+   * These minimum and maximum row heights (in points)
+   * are the same limits as those in a popular office
+   * software suite.
+   */
+  const double MIN_ROW_HEIGHT = 0.0;
+  const double MAX_ROW_HEIGHT = 409.0;
+
+  /**
    * These are the maximum lengths (in characters) of strings
    * and formulas in a popular office software suite.
    */
@@ -230,6 +238,11 @@ namespace BasicWorkbook
     bool operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept;
   };
 
+  struct row_heights_sort_compare
+  {
+    bool operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept;
+  };
+
   uint32_t column_to_integer(const std::string &column) noexcept(false);
   std::string integer_to_column(uint32_t decimal) noexcept(false);
   integerref_t mixedref_to_integerref(const std::string &mixedref) noexcept(false);
@@ -262,6 +275,7 @@ namespace BasicWorkbook
     void add_merged_string_cell(const std::string &start_ref, const std::string &end_ref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
     void set_column_width(const uint32_t col, const double width) noexcept(false);
     void set_column_width(const std::string &column, const double width) noexcept(false);
+    void set_row_height(const uint32_t row, const double height) noexcept(false);
     std::string get_name(void) const noexcept;
 
   private:
@@ -315,6 +329,13 @@ namespace BasicWorkbook
      * the width is the second element of the pair.
      */
     std::set<std::pair<uint32_t,double>, column_widths_sort_compare> column_widths;
+
+    /**
+     * This set holds any custom row heights.
+     * The row index is the first element of the pair;
+     * the height is the second element of the pair.
+     */
+    std::set<std::pair<uint32_t,double>, row_heights_sort_compare> row_heights;
 
     /**
      * This Sheet's cells are stored in a set so that they are
