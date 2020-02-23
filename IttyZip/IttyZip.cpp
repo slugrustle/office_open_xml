@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include <stdexcept>
 
 namespace IttyZip
 {
@@ -155,7 +156,7 @@ namespace IttyZip
     out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
     if (!out_file.is_open())
     {
-      throw std::exception(CANNOT_OPEN_MESG);
+      throw std::runtime_error(std::string(CANNOT_OPEN_MESG));
     }
     else
     {
@@ -174,7 +175,7 @@ namespace IttyZip
   {
     if (opened || out_file.is_open())
     {
-      throw std::exception(DOUBLE_OPEN_MESG);
+      throw std::runtime_error(std::string(DOUBLE_OPEN_MESG));
     }
     else
     {
@@ -185,7 +186,7 @@ namespace IttyZip
       out_file.open(outputFilename, std::ios::binary | std::ios::out | std::ios::trunc);
       if (!out_file.is_open())
       {
-        throw std::exception(CANNOT_OPEN_MESG);
+        throw std::runtime_error(std::string(CANNOT_OPEN_MESG));
       }
       else
       {
@@ -207,15 +208,15 @@ namespace IttyZip
   {
     if (!opened)
     {
-      throw std::exception(NOT_OPENED_MESG);
+      throw std::runtime_error(std::string(NOT_OPENED_MESG));
     }
     else if (!out_file.is_open())
     {
-      throw std::exception(UNEXPECTED_CLOSE_MESG);
+      throw std::runtime_error(std::string(UNEXPECTED_CLOSE_MESG));
     }
     else if (out_file.fail())
     {
-      throw std::exception(OUTPUT_FAIL_MESG);
+      throw std::runtime_error(std::string(OUTPUT_FAIL_MESG));
     }
     else
     {
@@ -224,7 +225,7 @@ namespace IttyZip
       std::pair<std::set<std::string>::iterator, bool> ins_ret = filenames.insert(file_headers.first.filename);
       if (!ins_ret.second)
       {
-        throw std::exception(DUPLICATE_FILE_MESG);
+        throw std::runtime_error(std::string(DUPLICATE_FILE_MESG));
       }
       else
       {
@@ -250,19 +251,19 @@ namespace IttyZip
   {
     if (num_files == 0u || next_offset == 0u || central_directory.empty())
     {
-      throw std::exception(EMPTY_FINALIZE_MESG);
+      throw std::runtime_error(std::string(EMPTY_FINALIZE_MESG));
     }
     else if (!opened)
     {
-      throw std::exception(NOT_OPENED_MESG);
+      throw std::runtime_error(std::string(NOT_OPENED_MESG));
     }
     else if (!out_file.is_open())
     {
-      throw std::exception(UNEXPECTED_CLOSE_MESG);
+      throw std::runtime_error(std::string(UNEXPECTED_CLOSE_MESG));
     }
     else if (out_file.fail())
     {
-      throw std::exception(OUTPUT_FAIL_MESG);
+      throw std::runtime_error(std::string(OUTPUT_FAIL_MESG));
     }
     else
     {
@@ -342,15 +343,15 @@ namespace IttyZip
   {
     if (!opened)
     {
-      throw std::exception(NOT_OPENED_MESG);
+      throw std::runtime_error(std::string(NOT_OPENED_MESG));
     }
     else if (!out_file.is_open())
     {
-      throw std::exception(UNEXPECTED_CLOSE_MESG);
+      throw std::runtime_error(std::string(UNEXPECTED_CLOSE_MESG));
     }
     else if (out_file.fail())
     {
-      throw std::exception(OUTPUT_FAIL_MESG);
+      throw std::runtime_error(std::string(OUTPUT_FAIL_MESG));
     }
     else
     {
@@ -457,15 +458,15 @@ namespace IttyZip
   {
     if (!opened)
     {
-      throw std::exception(NOT_OPENED_MESG);
+      throw std::runtime_error(std::string(NOT_OPENED_MESG));
     }
     else if (!out_file.is_open())
     {
-      throw std::exception(UNEXPECTED_CLOSE_MESG);
+      throw std::runtime_error(std::string(UNEXPECTED_CLOSE_MESG));
     }
     else if (out_file.fail())
     {
-      throw std::exception(OUTPUT_FAIL_MESG);
+      throw std::runtime_error(std::string(OUTPUT_FAIL_MESG));
     }
     else
     {

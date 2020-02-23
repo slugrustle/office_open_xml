@@ -62,13 +62,15 @@ namespace BasicWorkbook
   {
     NUMBER = 0u,
     FORMULA = 1u,
-    STRING = 2u
+    STRING = 2u,
+    EMPTY = 3u
   };
 
   /**
    * Number formats supported for NUMBER and FORMULA type cells.
    * General is the Office Open XML General cell format type
    * and also the default if another format is not specified.
+   * TEXT is used for string cells
    * FIX is for fixed point
    * SCI is for scientific notation
    * PCT is for percentage; a 0.1 cell value results in 10%
@@ -78,58 +80,101 @@ namespace BasicWorkbook
   enum class NumberFormat : uint8_t
   {
     GENERAL = 0u,
-    FIX0 = 1u,
-    FIX1 = 2u,
-    FIX2 = 3u,
-    FIX3 = 4u,
-    FIX4 = 5u,
-    FIX5 = 6u,
-    FIX6 = 7u,
-    FIX7 = 8u,
-    FIX8 = 9u,
-    FIX9 = 10u,
-    FIX10 = 11u,
-    FIX11 = 12u,
-    FIX12 = 13u,
-    FIX13 = 14u,
-    FIX14 = 15u,
-    FIX15 = 16u,
-    FIX16 = 17u,
-    SCI0 = 18u,
-    SCI1 = 19u,
-    SCI2 = 20u,
-    SCI3 = 21u,
-    SCI4 = 22u,
-    SCI5 = 23u,
-    SCI6 = 24u,
-    SCI7 = 25u,
-    SCI8 = 26u,
-    SCI9 = 27u,
-    SCI10 = 28u,
-    SCI11 = 29u,
-    SCI12 = 30u,
-    SCI13 = 31u,
-    SCI14 = 32u,
-    SCI15 = 33u,
-    SCI16 = 34u,
-    PCT0 = 35u,
-    PCT1 = 36u,
-    PCT2 = 37u,
-    PCT3 = 38u,
-    PCT4 = 39u,
-    PCT5 = 40u,
-    PCT6 = 41u,
-    PCT7 = 42u,
-    PCT8 = 43u,
-    PCT9 = 44u,
-    PCT10 = 45u,
-    PCT11 = 46u,
-    PCT12 = 47u,
-    PCT13 = 48u,
-    PCT14 = 49u,
-    PCT15 = 50u,
-    PCT16 = 51u
+    TEXT    = 49u,
+    FIX0    = 100u,
+    FIX1    = 101u,
+    FIX2    = 102u,
+    FIX3    = 103u,
+    FIX4    = 104u,
+    FIX5    = 105u,
+    FIX6    = 106u,
+    FIX7    = 107u,
+    FIX8    = 108u,
+    FIX9    = 109u,
+    FIX10   = 110u,
+    FIX11   = 111u,
+    FIX12   = 112u,
+    FIX13   = 113u,
+    FIX14   = 114u,
+    FIX15   = 115u,
+    FIX16   = 116u,
+    SCI0    = 117u,
+    SCI1    = 118u,
+    SCI2    = 119u,
+    SCI3    = 120u,
+    SCI4    = 121u,
+    SCI5    = 122u,
+    SCI6    = 123u,
+    SCI7    = 124u,
+    SCI8    = 125u,
+    SCI9    = 126u,
+    SCI10   = 127u,
+    SCI11   = 128u,
+    SCI12   = 129u,
+    SCI13   = 130u,
+    SCI14   = 131u,
+    SCI15   = 132u,
+    SCI16   = 133u,
+    PCT0    = 134u,
+    PCT1    = 135u,
+    PCT2    = 136u,
+    PCT3    = 137u,
+    PCT4    = 138u,
+    PCT5    = 139u,
+    PCT6    = 140u,
+    PCT7    = 141u,
+    PCT8    = 142u,
+    PCT9    = 143u,
+    PCT10   = 144u,
+    PCT11   = 145u,
+    PCT12   = 146u,
+    PCT13   = 147u,
+    PCT14   = 148u,
+    PCT15   = 149u,
+    PCT16   = 150u
   };
+
+  /**
+   * Possible kinds of horizontal alignment of the value
+   * in the cell.
+   */
+  enum class HorizontalAlignment : uint8_t
+  {
+    GENERAL = 0u,
+    LEFT    = 1u,
+    CENTER  = 2u,
+    RIGHT   = 3u
+  };
+
+  /**
+   * Possible kinds of vertical alignment of the value
+   * in the cell.
+   */
+  enum class VerticalAlignment : uint8_t
+  {
+    BOTTOM = 0u,
+    CENTER = 1u,
+    TOP    = 2u
+  };
+
+  /**
+   * This struct holds the style information for
+   * a cell.
+   */
+  typedef struct
+  {
+    NumberFormat num_format;
+    HorizontalAlignment horiz_align;
+    VerticalAlignment vert_align;
+    bool wrap_text;
+    bool bold;
+  } cell_style_t;
+
+  /**
+   * Define the default cell styles.
+   */
+  const cell_style_t generic_style = {NumberFormat::GENERAL, HorizontalAlignment::GENERAL, VerticalAlignment::BOTTOM, false, false};
+  const cell_style_t generic_string_style = {NumberFormat::TEXT, HorizontalAlignment::GENERAL, VerticalAlignment::BOTTOM, false, false};
 
   /**
    * This is the representation of a single cell in
@@ -141,14 +186,29 @@ namespace BasicWorkbook
   {
     integerref_t integerref;
     CellType type;
-    NumberFormat num_format;
+    size_t style_index;
     double num_val;
     std::string str_fml_val;
   } cell_t;
 
+  /**
+   * This type holds the starting (upper left) reference and
+   * the ending (lower right) reference for a merged cell.
+   */
+  typedef struct
+  {
+    integerref_t start_ref;
+    integerref_t end_ref;
+  } merged_cell_t;
+
   struct cell_sort_compare
   {
     bool operator() (const cell_t &a, const cell_t &b) const noexcept;
+  };
+
+  struct merged_cell_sort_compare
+  {
+    bool operator() (const merged_cell_t &a, const merged_cell_t &b) const noexcept;
   };
 
   struct column_widths_sort_compare
@@ -163,25 +223,43 @@ namespace BasicWorkbook
   std::string integerref_to_mixedref(const integerref_t &integerref) noexcept(false);
   bool case_insensitive_same(const std::string &a, const std::string &b) noexcept;
 
+  class Workbook;
+
   class Sheet
   {
   public:
-    void add_number_cell(const uint32_t row, const uint32_t col, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_number_cell(const integerref_t &integerref, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_number_cell(const std::string &mixedref, const double number, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_formula_cell(const integerref_t &integerref, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_formula_cell(const std::string &mixedref, const std::string &formula, const NumberFormat num_format = NumberFormat::GENERAL) noexcept(false);
-    void add_string_cell(const uint32_t row, const uint32_t col, const std::string &value) noexcept(false);
-    void add_string_cell(const integerref_t &integerref, const std::string &value) noexcept(false);
-    void add_string_cell(const std::string &mixedref, const std::string &value) noexcept(false);
+    void add_number_cell(const uint32_t row, const uint32_t col, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_number_cell(const integerref_t &integerref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_number_cell(const std::string &mixedref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_number_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_number_cell(const integerref_t &start_ref, const integerref_t &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_number_cell(const std::string &start_ref, const std::string &end_ref, const double number, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_formula_cell(const integerref_t &integerref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_formula_cell(const std::string &mixedref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_formula_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_formula_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    //void add_merged_formula_cell(const std::string &start_ref, const std::string &end_ref, const std::string &formula, const cell_style_t &cell_style = generic_style) noexcept(false);
+    void add_string_cell(const uint32_t row, const uint32_t col, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
+    void add_string_cell(const integerref_t &integerref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
+    void add_string_cell(const std::string &mixedref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
+    void add_merged_string_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
+    void add_merged_string_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
+    void add_merged_string_cell(const std::string &start_ref, const std::string &end_ref, const std::string &value, const cell_style_t &cell_style = generic_string_style) noexcept(false);
     void set_column_width(const uint32_t col, const double width) noexcept(false);
     void set_column_width(const std::string &column, const double width) noexcept(false);
     std::string get_name(void) const noexcept;
 
   private:
-    Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_) noexcept(false);
+    Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_, Workbook &workbook_) noexcept(false);
+    void add_empty_cell(const integerref_t &integerref, const cell_style_t &cell_style) noexcept(false);
     std::string generate_file(void) const noexcept;
+
+    /**
+     * Reference to the enclosing workbook.
+     * Solely used to call workbook.addStyle().
+     */
+    Workbook &workbook;
 
     /**
      * The name of the Sheet as displayed on the tab used to view
@@ -237,6 +315,14 @@ namespace BasicWorkbook
      */
     std::set<cell_t, cell_sort_compare> cells;
 
+    /**
+     * Merged cell references are stored in this set because these
+     * are needed to generate the Sheet .xml file.
+     * Duplicate / overlapping merged cells is handled implicitly
+     * by ordinary duplicate cell detection.
+     */
+    std::set<merged_cell_t, merged_cell_sort_compare> merged_cells;
+
     friend class Workbook;
   };
 
@@ -245,18 +331,24 @@ namespace BasicWorkbook
   public:
     Workbook(void) noexcept;
     Sheet& addSheet(const std::string &name) noexcept(false);
+    size_t addStyle(const cell_style_t &cell_style) noexcept;
     void publish(const std::string &filename) noexcept(false);
 
   private:
     /**
      * All of this Workbook's sheets are stored in this vector.
-     * Compared to a set, duplicate name search is O(n) instead
-     * of O(log n), but I don't anticipate very many sheets compared
-     * to cells, and the case-insensitive duplicate name comparison
-     * is easier to write in a linear search over a vector.
-     * Basically, I'm punting on this one.
+     * This is not a set (which would have faster duplicate name
+     * search) because the sheets are stored in the order entered,
+     * and this might not be a sorted order.
      */
     std::vector<Sheet> sheets;
+
+    /**
+     * The various cell styles actually in use are stored in
+     * this array so that the styles.xml file only needs to define
+     * styles that are really used in this workbook.
+     */
+    std::vector<cell_style_t> cell_styles;
 
     /**
      * All Office Open XML files are stored in ZIP archives as the

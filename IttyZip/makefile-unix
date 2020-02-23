@@ -1,0 +1,29 @@
+# Run 
+# make -f makefile-unix
+# from the command line to build all executables in this directory.
+#
+# Run 
+# make -f makefile-unix clean
+# to delete all executables and .o files created during the build.
+#
+# Run 
+# make -f makefile-unix cleanobj
+# to delete all .o files created during the build.
+
+BASE_OPTIONS = -Wall -I../IttyZip -O3 -static -static-libstdc++ -std=c++14 -flto -march=athlon64 
+OBJ_FILES = IttyZip.o
+EXE_FILES = IttyZipDemo
+
+all: $(EXE_FILES)
+
+IttyZip.o:IttyZip.cpp IttyZip.h
+	g++ $(BASE_OPTIONS) -c -o $@ IttyZip.cpp
+
+IttyZipDemo:IttyZipDemo.cpp IttyZip.o
+	g++ $(BASE_OPTIONS) -o $@ IttyZip.o IttyZipDemo.cpp
+
+clean:
+	rm -f $(EXE_FILES) $(OBJ_FILES)
+
+cleanobj:
+	rm -f $(OBJ_FILES)

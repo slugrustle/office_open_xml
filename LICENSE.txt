@@ -1,10 +1,21 @@
 All files produced by the author of this repository, including
-IttyZip.cpp
-IttyZip.h
-IttyZipDemo.cpp
-BasicWorkbook.cpp
-BasicWorkbook.h
-BasicWorkbookDemo.cpp
+
+[IttyZip/ directory]
+  IttyZip.cpp
+  IttyZip.h
+  IttyZipDemo.cpp
+  makefile-nmake
+  makefile-unix
+  README.md
+
+[BasicWorkbook/ directory]
+  BasicWorkbook.cpp
+  BasicWorkbook.h
+  BasicWorkbookDemo.cpp
+  makefile-nmake
+  makefile-unix
+  README.md
+
 are published under the CC0 1.0 Universal Public Domain Dedication,
 which is reproduced below.
 

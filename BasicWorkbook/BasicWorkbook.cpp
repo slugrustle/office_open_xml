@@ -20,6 +20,7 @@
 #include <limits>
 #include <chrono>
 #include <ctime>
+#include <algorithm>
 #include "BasicWorkbook.h"
 
 namespace BasicWorkbook
@@ -42,11 +43,36 @@ namespace BasicWorkbook
   }
 
   /**
+   * Similar behavior to cell_sort_compare::operator() above, but
+   * it operates on the start_ref of a merged_cell_t.
+   */
+  bool merged_cell_sort_compare::operator() (const merged_cell_t &a, const merged_cell_t &b) const noexcept
+  {
+    if (a.start_ref.row < b.start_ref.row ||
+        (a.start_ref.row == b.start_ref.row && 
+         a.start_ref.col < b.start_ref.col)) return true;
+    return false;
+  }
+
+  /**
    * Sort the elements of column_widths purely by column index.
    */
   bool column_widths_sort_compare::operator() (const std::pair<uint32_t, double> &a, const std::pair<uint32_t, double> &b) const noexcept
   {
     return a.first < b.first;
+  }
+
+  /**
+   * This operator allows the use of std::find on the std::vector<cell_style_t>
+   * inside Workbook.
+   */
+  bool operator==(const cell_style_t &lhs, const cell_style_t &rhs)
+  {
+    return (lhs.num_format == rhs.num_format &&
+            lhs.horiz_align == rhs.horiz_align &&
+            lhs.vert_align == rhs.vert_align &&
+            lhs.wrap_text == rhs.wrap_text &&
+            lhs.bold == rhs.bold);
   }
 
   /**
@@ -57,21 +83,21 @@ namespace BasicWorkbook
    */
   uint32_t column_to_integer(const std::string &column) noexcept(false)
   {
-    if (column.empty()) throw std::invalid_argument("column_to_integer() received empty input string.");
+    if (column.empty()) throw std::invalid_argument(std::string("column_to_integer() received empty input string."));
 
     uint32_t integer = 0u;
     for (size_t jChar = 0u; jChar < column.size()-1u; jChar++)
     {
-      char this_char = std::toupper(column.at(jChar));
-      if (!std::isupper(this_char)) throw std::invalid_argument("column_to_integer() received non-alphabetic input character.");
+      char this_char = static_cast<char>(std::toupper(column.at(jChar)));
+      if (!std::isupper(this_char)) throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
       integer = 26u * (integer + static_cast<uint32_t>(this_char) - 64u);
     }
 
-    char last_char = std::toupper(column.at(column.size()-1u));
-    if (!std::isupper(last_char)) throw std::invalid_argument("column_to_integer() received non-alphabetic input character.");
+    char last_char = static_cast<char>(std::toupper(column.at(column.size()-1u)));
+    if (!std::isupper(last_char)) throw std::invalid_argument(std::string("column_to_integer() received non-alphabetic input character."));
     integer += static_cast<uint32_t>(last_char) - 64u;
 
-    if (integer > MAX_COL) throw std::invalid_argument("column_to_integer() received a too large column index.");
+    if (integer > MAX_COL) throw std::invalid_argument(std::string("column_to_integer() received a too large column index."));
 
     return integer;
   }
@@ -83,8 +109,8 @@ namespace BasicWorkbook
    */
   std::string integer_to_column(uint32_t integer) noexcept(false)
   {
-    if (integer == 0u) throw std::invalid_argument("integer_to_column() received an input of 0.");
-    if (integer > MAX_COL) throw std::invalid_argument("integer_to_column() received a too large column index.");
+    if (integer == 0u) throw std::invalid_argument(std::string("integer_to_column() received an input of 0."));
+    if (integer > MAX_COL) throw std::invalid_argument(std::string("integer_to_column() received a too large column index."));
     
     std::string column;
 
@@ -117,21 +143,21 @@ namespace BasicWorkbook
       if (std::isalpha(this_char))
       {
         found_first_alpha = true;
-        if (found_first_decimal) throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+        if (found_first_decimal) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
       }
       else if (std::isdigit(this_char))
       {
-        if (!found_first_alpha) throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+        if (!found_first_alpha) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
         if (!found_first_decimal) row_start = jChar;
         found_first_decimal = true;
       }
       else
       {
-        throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+        throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
       }
     }
 
-    if (!found_first_alpha || !found_first_decimal) throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+    if (!found_first_alpha || !found_first_decimal) throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
 
     std::string column_str = mixedref.substr(0u, row_start);
     integerref_t integerref;
@@ -146,19 +172,19 @@ namespace BasicWorkbook
     catch (const std::invalid_argument &e)
     {
       e;
-      throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
     }
     catch (const std::out_of_range &e)
     {
       e;
-      throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
     }
 
     if (after_int != mixedref.size() - row_start || 
         row_decode < 1ll || 
         row_decode > static_cast<int64_t>(MAX_ROW))
     {
-      throw std::invalid_argument("mixedref_to_integerref() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("mixedref_to_integerref() received an invalid cell reference."));
     }
 
     integerref.row = static_cast<uint32_t>(row_decode);
@@ -193,7 +219,7 @@ namespace BasicWorkbook
         integerref.row < 1u ||
         integerref.row > MAX_ROW)
     {
-      throw std::invalid_argument("integerref_to_mixedref() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("integerref_to_mixedref() received an invalid cell reference."));
     }
 
     return integer_to_column(integerref.col) + std::to_string(integerref.row);
@@ -220,35 +246,35 @@ namespace BasicWorkbook
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
    */
-  void Sheet::add_number_cell(const uint32_t row, const uint32_t col, const double number, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_number_cell(const uint32_t row, const uint32_t col, const double number, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref;
     integerref.row = row;
     integerref.col = col;
-    this->add_number_cell(integerref, number, num_format);
+    this->add_number_cell(integerref, number, cell_style);
   }
 
   /**
    * Add a cell with a numeric value to this Sheet at the specified row & column.
    */
-  void Sheet::add_number_cell(const integerref_t &integerref, const double number, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_number_cell(const integerref_t &integerref, const double number, const cell_style_t &cell_style) noexcept(false)
   {
     if (integerref.col < 1u || 
         integerref.col > MAX_COL ||
         integerref.row < 1u ||
         integerref.row > MAX_ROW)
     {
-      throw std::invalid_argument("add_number_cell() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("add_number_cell() received an invalid cell reference."));
     }
 
     cell_t cell = {0};
     cell.integerref = integerref;
     cell.type = CellType::NUMBER;
-    cell.num_format = num_format;
+    cell.style_index = workbook.addStyle(cell_style);
     cell.num_val = number;
     
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::exception("add_number_cell() encountered duplicate insertion of a cell at the same reference.");
+    if (!insret.second) throw std::runtime_error(std::string("add_number_cell() encountered duplicate insertion of a cell at the same reference."));
     used_columns.insert(integerref.col);
   }
 
@@ -257,10 +283,10 @@ namespace BasicWorkbook
    * The caller may prefer to use mixedref format, especially if they are working
    * with formulas. This interface is provided to support that.
    */
-  void Sheet::add_number_cell(const std::string &mixedref, const double number, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_number_cell(const std::string &mixedref, const double number, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
-    this->add_number_cell(integerref, number, num_format);
+    this->add_number_cell(integerref, number, cell_style);
   }
 
   /**
@@ -268,18 +294,18 @@ namespace BasicWorkbook
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
    */
-  void Sheet::add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_formula_cell(const uint32_t row, const uint32_t col, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref;
     integerref.row = row;
     integerref.col = col;
-    this->add_formula_cell(integerref, formula, num_format);
+    this->add_formula_cell(integerref, formula, cell_style);
   }
 
   /**
    * Add a cell with a formula to this Sheet at the specified row & column.
    */
-  void Sheet::add_formula_cell(const integerref_t &integerref, const std::string &formula, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_formula_cell(const integerref_t &integerref, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
   {
     if (integerref.col < 1u || 
         integerref.col > MAX_COL ||
@@ -292,12 +318,12 @@ namespace BasicWorkbook
     cell_t cell = {0};
     cell.integerref = integerref;
     cell.type = CellType::FORMULA;
-    cell.num_format = num_format;
+    cell.style_index = workbook.addStyle(cell_style);
     cell.str_fml_val = formula;
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::exception("add_formula_cell() encountered duplicate insertion of a cell at the same reference.");
+    if (!insret.second) throw std::runtime_error(std::string("add_formula_cell() encountered duplicate insertion of a cell at the same reference."));
     used_columns.insert(integerref.col);
   }
 
@@ -306,10 +332,10 @@ namespace BasicWorkbook
    * The caller may prefer to use mixedref format, especially if they are working
    * with formulas. This interface is provided to support that.
    */
-  void Sheet::add_formula_cell(const std::string &mixedref, const std::string &formula, const NumberFormat num_format) noexcept(false)
+  void Sheet::add_formula_cell(const std::string &mixedref, const std::string &formula, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
-    this->add_formula_cell(integerref, formula, num_format);
+    this->add_formula_cell(integerref, formula, cell_style);
   }
 
   /**
@@ -317,48 +343,132 @@ namespace BasicWorkbook
    * integerref_t is a little inconvenient for the caller, so this interface is
    * provided to make things easier.
    */
-  void Sheet::add_string_cell(const uint32_t row, const uint32_t col, const std::string &value) noexcept(false)
+  void Sheet::add_string_cell(const uint32_t row, const uint32_t col, const std::string &value, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref;
     integerref.row = row;
     integerref.col = col;
-    this->add_string_cell(integerref, value);
+    this->add_string_cell(integerref, value, cell_style);
   }
 
   /**
    * Add a cell with a string value to this Sheet at the specified row & column.
    */
-  void Sheet::add_string_cell(const integerref_t &integerref, const std::string &value) noexcept(false)
+  void Sheet::add_string_cell(const integerref_t &integerref, const std::string &value, const cell_style_t &cell_style) noexcept(false)
   {
     if (integerref.col < 1u || 
         integerref.col > MAX_COL ||
         integerref.row < 1u ||
         integerref.row > MAX_ROW)
     {
-      throw std::invalid_argument("add_string_cell() received an invalid cell reference.");
+      throw std::invalid_argument(std::string("add_string_cell() received an invalid cell reference."));
     }
 
     cell_t cell = {0};
     cell.integerref = integerref;
     cell.type = CellType::STRING;
+    cell.style_index = workbook.addStyle(cell_style);
     cell.str_fml_val = value;
     cell.num_val = std::numeric_limits<double>::quiet_NaN();
 
     std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
-    if (!insret.second) throw std::exception("add_string_cell() encountered duplicate insertion of a cell at the same reference.");
+    if (!insret.second) throw std::runtime_error(std::string("add_string_cell() encountered duplicate insertion of a cell at the same reference."));
     used_columns.insert(integerref.col);
   }
-
 
   /**
    * Add a cell with a string value to this Sheet at the specified row & column.
    * The caller may prefer to use mixedref format, especially if they are working
    * with formulas. This interface is provided to support that.
    */
-  void Sheet::add_string_cell(const std::string &mixedref, const std::string &value) noexcept(false)
+  void Sheet::add_string_cell(const std::string &mixedref, const std::string &value, const cell_style_t &cell_style) noexcept(false)
   {
     integerref_t integerref = mixedref_to_integerref(mixedref);
-    this->add_string_cell(integerref, value);
+    this->add_string_cell(integerref, value, cell_style);
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the string value in this merged cell.
+   * integerref_t is a little inconvenient for the caller, so this interface is
+   * provided to make things easier.
+   */
+  void Sheet::add_merged_string_cell(const uint32_t start_row, const uint32_t start_col, const uint32_t end_row, const uint32_t end_col, const std::string &value, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t start_ref;
+    start_ref.row = start_row;
+    start_ref.col = start_col;
+
+    integerref_t end_ref;
+    end_ref.row = end_row;
+    end_ref.col = end_col;
+
+    this->add_merged_string_cell(start_ref, end_ref, value, cell_style);
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the string value in this merged cell.
+   */
+  void Sheet::add_merged_string_cell(const integerref_t &start_ref, const integerref_t &end_ref, const std::string &value, const cell_style_t &cell_style) noexcept(false)
+  {
+    if (start_ref.col < 1u || 
+        start_ref.col > MAX_COL ||
+        start_ref.row < 1u ||
+        start_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_string_cell() received an invalid starting cell reference."));
+    }
+
+    if (end_ref.col < 1u || 
+        end_ref.col > MAX_COL ||
+        end_ref.row < 1u ||
+        end_ref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_merged_string_cell() received an invalid ending cell reference."));
+    }
+
+    if (start_ref.col > end_ref.col || 
+        start_ref.row > end_ref.row ||
+        (start_ref.col == end_ref.col &&
+         start_ref.row == end_ref.row))
+    {
+      throw std::invalid_argument(std::string("add_merged_string_cell() received an ending cell reference equal or prior to its starting cell reference."));
+    }
+
+    this->add_string_cell(start_ref, value, cell_style);
+
+    for (uint32_t jRow = start_ref.row; jRow <= end_ref.row; jRow++)
+    {
+      for (uint32_t jCol = start_ref.col; jCol <= end_ref.col; jCol++)
+      {
+        if (jRow == start_ref.row && jCol == start_ref.col) continue;
+
+        integerref_t this_ref;
+        this_ref.row = jRow;
+        this_ref.col = jCol;
+        this->add_empty_cell(this_ref, cell_style);
+      }
+    }
+
+    merged_cell_t this_merge;
+    this_merge.start_ref = start_ref;
+    this_merge.end_ref = end_ref;
+    merged_cells.insert(std::move(this_merge));
+  }
+
+  /**
+   * Merge the cells bounded by start_ref (upper left corner) and end_ref
+   * (lower right corner) and put the string value in this merged cell.
+   * The caller may prefer to use mixedref format, especially if they are working
+   * with formulas. This interface is provided to support that.
+   */
+  void Sheet::add_merged_string_cell(const std::string &start_ref, const std::string &end_ref, const std::string &value, const cell_style_t &cell_style) noexcept(false)
+  {
+    integerref_t int_start_ref = mixedref_to_integerref(start_ref);
+    integerref_t int_end_ref = mixedref_to_integerref(end_ref);
+
+    this->add_merged_string_cell(int_start_ref, int_end_ref, value, cell_style);
   }
 
   /**
@@ -372,8 +482,8 @@ namespace BasicWorkbook
    */
   void Sheet::set_column_width(const uint32_t col, const double width) noexcept(false)
   {
-    if (width < MIN_COL_WIDTH || width > MAX_COL_WIDTH) throw std::invalid_argument("set_column_width received invalid width argument.");
-    if (col < 1u || col > MAX_COL) throw std::invalid_argument("set_column_width received invalid col argument.");
+    if (width < MIN_COL_WIDTH || width > MAX_COL_WIDTH) throw std::invalid_argument(std::string("set_column_width received invalid width argument."));
+    if (col < 1u || col > MAX_COL) throw std::invalid_argument(std::string("set_column_width received invalid col argument."));
 
     column_widths.insert(std::make_pair(col, width));
   }
@@ -404,10 +514,36 @@ namespace BasicWorkbook
    * name the Sheet, since name is displayed on the Sheet's tab in a
    * popular office software suite.
    */
-  Sheet::Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_) noexcept(false) :
-    name(name_), filename(filename_), sheetId(sheetId_), relId(relId_)
+  Sheet::Sheet(const std::string &name_, const std::string &filename_, const uint32_t sheetId_, const std::string &relId_, Workbook &workbook_) noexcept(false) :
+    name(name_), filename(filename_), sheetId(sheetId_), relId(relId_), workbook(workbook_)
   {
     /* Nothing. */
+  }
+
+  /**
+   * Adds an empty cell to the sheet. Used for all cell references except
+   * the upper left reference in a merged cell.
+   */
+  void Sheet::add_empty_cell(const integerref_t &integerref, const cell_style_t &cell_style) noexcept(false)
+  {
+    if (integerref.col < 1u || 
+        integerref.col > MAX_COL ||
+        integerref.row < 1u ||
+        integerref.row > MAX_ROW)
+    {
+      throw std::invalid_argument(std::string("add_empty_cell() received an invalid cell reference."));
+    }
+
+    cell_t cell = {0};
+    cell.integerref = integerref;
+    cell.type = CellType::EMPTY;
+    cell.style_index = workbook.addStyle(cell_style);
+    cell.str_fml_val = "";
+    cell.num_val = std::numeric_limits<double>::quiet_NaN();
+
+    std::pair<std::set<cell_t,cell_sort_compare>::iterator, bool> insret = cells.insert(std::move(cell));
+    if (!insret.second) throw std::runtime_error(std::string("add_empty_cell() encountered duplicate insertion of a cell at the same reference."));
+    used_columns.insert(integerref.col);
   }
 
   /**
@@ -462,28 +598,46 @@ namespace BasicWorkbook
         if (this_cell.type == CellType::NUMBER)
         {
           file += u8"<c r=\"" + mixedref + "\"";
-          
-          if (this_cell.num_format != NumberFormat::GENERAL)
-            file += u8" s=\"" + std::to_string(static_cast<uint8_t>(this_cell.num_format)) + "\"";
-
+          file += u8" s=\"" + std::to_string(this_cell.style_index) + "\"";
           file += u8"><v>" + std::to_string(this_cell.num_val) + "</v></c>";
         }
         else if (this_cell.type == CellType::FORMULA)
         {
           file += u8"<c r=\"" + mixedref + "\"";
-
-          if (this_cell.num_format != NumberFormat::GENERAL)
-            file += u8" s=\"" + std::to_string(static_cast<uint8_t>(this_cell.num_format)) + "\"";
-
+          file += u8" s=\"" + std::to_string(this_cell.style_index) + "\"";
           file += u8"><f>" + this_cell.str_fml_val + "</f></c>";
         }
-        else
+        else if (this_cell.type == CellType::STRING)
         {
-          file += u8"<c r=\"" + mixedref + "\" s=\"52\" t=\"inlineStr\">";
-          file += u8"<is><t>" + this_cell.str_fml_val + "</t></is></c>";
+          file += u8"<c r=\"" + mixedref + "\"";
+          file += u8" s=\"" + std::to_string(this_cell.style_index) + "\" ";
+          file += u8"t=\"inlineStr\"><is><t>" + this_cell.str_fml_val + "</t></is></c>";
+        }
+        else if (this_cell.type == CellType::EMPTY)
+        {
+          file += u8"<c r=\"" + mixedref + "\"";
+          file += u8" s=\"" + std::to_string(this_cell.style_index) + "\"/>";
         }
       }
       file += u8"</row></sheetData>";
+    }
+
+    if (!merged_cells.empty())
+    {
+      file += u8"<mergeCells count=\"" + std::to_string(merged_cells.size()) + "\">";
+      
+      for (std::set<merged_cell_t, merged_cell_sort_compare>::const_iterator merged_cell_itr = merged_cells.cbegin();
+           merged_cell_itr != merged_cells.cend();
+           merged_cell_itr++)
+      {
+        const merged_cell_t &this_merge = *merged_cell_itr;
+        std::string start_mixedref = integerref_to_mixedref(this_merge.start_ref);
+        std::string end_mixedref = integerref_to_mixedref(this_merge.end_ref);
+
+        file += u8"<mergeCell ref=\"" + start_mixedref + ":" + end_mixedref + "\"/>";
+      }
+      
+      file += u8"</mergeCells>";
     }
     
     file += u8"</worksheet>";
@@ -509,18 +663,36 @@ namespace BasicWorkbook
    */
   Sheet& Workbook::addSheet(const std::string &name) noexcept(false)
   {
-    if (name.empty()) throw std::invalid_argument("addsheet() received an empty name for a new sheet.");
+    if (name.empty()) throw std::invalid_argument(std::string("addsheet() received an empty name for a new sheet."));
 
     for (size_t jSheet = 0u; jSheet < sheets.size(); jSheet++)
     {
-      if (case_insensitive_same(name, sheets.at(jSheet).get_name())) throw std::exception("addSheet() received a new sheet with the same name as an existing sheet.");
+      if (case_insensitive_same(name, sheets.at(jSheet).get_name())) throw std::runtime_error(std::string("addSheet() received a new sheet with the same name as an existing sheet."));
     }
 
-    uint32_t sheetId = sheets.size() + 1u;
+    uint32_t sheetId = static_cast<uint32_t>(sheets.size() + 1u);
     std::string sheet_filename = "xl/worksheets/sheet" + std::to_string(sheetId) + ".xml";
     std::string sheet_relId = "rId" + std::to_string(sheetId + 1u);
-    sheets.push_back(std::move(Sheet(name, sheet_filename, sheetId, sheet_relId)));
+    sheets.push_back(std::move(Sheet(name, sheet_filename, sheetId, sheet_relId, *this)));
     return sheets.back();
+  }
+
+  /**
+   * If a style is already stored, this just returns the index of the style.
+   * Otherwise, it stores the style and then returns the index.
+   */
+  size_t Workbook::addStyle(const cell_style_t &cell_style) noexcept
+  {
+    std::vector<cell_style_t>::iterator itr = std::find(cell_styles.begin(), cell_styles.end(), cell_style);
+    if (itr == cell_styles.end())
+    {
+      cell_styles.push_back(cell_style);
+      return cell_styles.size() - 1u;
+    }
+    else
+    {
+      return static_cast<size_t>(itr - cell_styles.begin());
+    }
   }
 
   /**
@@ -529,9 +701,9 @@ namespace BasicWorkbook
    */
   void Workbook::publish(const std::string &filename) noexcept(false)
   {
-    if (sheets.empty()) throw std::exception("publish() called, but Workbook has no Sheets.");
+    if (sheets.empty()) throw std::runtime_error(std::string("publish() called, but Workbook has no Sheets."));
 
-    if (filename.empty()) throw std::invalid_argument("publish() called with empty filename.");
+    if (filename.empty()) throw std::invalid_argument(std::string("publish() called with empty filename."));
 
     archive.open(filename);
 
@@ -605,7 +777,7 @@ namespace BasicWorkbook
       const size_t TIME_BUF_SIZE = 22u;
       char timestamp[TIME_BUF_SIZE];
       size_t retval = strftime(timestamp, TIME_BUF_SIZE, "%Y-%m-%dT%H:%M:%SZ", &timestruct);
-      if (retval == 0u) throw std::exception("Could not assemble timestamp string for core.xml in publish().");
+      if (retval == 0u) throw std::length_error(std::string("Could not assemble timestamp string for core.xml in publish()."));
       std::string time_string(timestamp);
 
       core += u8"<dcterms:created xsi:type=\"dcterms:W3CDTF\">" + time_string + "</dcterms:created>";
@@ -690,7 +862,13 @@ namespace BasicWorkbook
       styles += u8"<numFmt numFmtId=\"149\" formatCode=\"0.000000000000000%\"/>";
       styles += u8"<numFmt numFmtId=\"150\" formatCode=\"0.0000000000000000%\"/>";
       styles += u8"</numFmts>";
-      styles += u8"<fonts count=\"1\"><font>";
+      styles += u8"<fonts count=\"2\"><font>";
+      styles += u8"<sz val=\"12\"/>";
+      styles += u8"<color rgb=\"FF000000\"/>";
+      styles += u8"<name val=\"Calibri\"/>";
+      styles += u8"<family val=\"2\"/>";
+      styles += u8"<scheme val=\"minor\"/>";
+      styles += u8"</font><font><b/>";
       styles += u8"<sz val=\"12\"/>";
       styles += u8"<color rgb=\"FF000000\"/>";
       styles += u8"<name val=\"Calibri\"/>";
@@ -706,60 +884,78 @@ namespace BasicWorkbook
       styles += u8"<cellStyleXfs count=\"1\">";
       styles += u8"<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>";
       styles += u8"</cellStyleXfs>";
-      styles += u8"<cellXfs count=\"53\">";
-      styles += u8"<xf numFmtId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"100\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"101\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"102\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"103\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"104\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"105\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"106\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"107\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"108\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"109\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"110\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"111\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"112\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"113\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"114\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"115\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"116\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"117\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"118\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"119\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"120\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"121\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"122\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"123\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"124\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"125\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"126\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"127\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"128\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"129\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"130\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"131\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"132\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"133\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"134\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"135\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"136\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"137\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"138\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"139\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"140\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"141\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"142\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"143\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"144\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"145\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"146\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"147\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"148\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"149\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"150\" xfId=\"0\" applyNumberFormat=\"1\"/>";
-      styles += u8"<xf numFmtId=\"49\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      styles += u8"<cellXfs count=\"" + std::to_string(std::max(cell_styles.size(), (size_t)1u)) + "\">";
+      
+      if (cell_styles.empty())
+      {
+        styles += u8"<xf numFmtId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>";
+      }
+      else
+      {
+        for (size_t jStyle = 0u; jStyle < cell_styles.size(); jStyle++)
+        {
+          cell_style_t this_style = cell_styles.at(jStyle);
+          styles += u8"<xf numFmtId=\"" + std::to_string(static_cast<uint8_t>(this_style.num_format)) + "\" ";
+          
+          if (this_style.bold)
+          {
+            styles += u8"fontId=\"1\" ";
+          }
+          else
+          {
+            styles += u8"fontId=\"0\" ";
+          }
+          
+          styles += u8"fillId=\"0\" borderId=\"0\" xfId=\"0\" ";
+          styles += u8"applyNumberFormat=\"1\" applyFont=\"1\" applyAlignment=\"1\">";
+          styles += u8"<alignment horizontal=\"";
+          
+          switch (this_style.horiz_align)
+          {
+            case HorizontalAlignment::LEFT:
+              styles += u8"left";
+              break;
+            case HorizontalAlignment::CENTER:
+              styles += u8"center";
+              break;
+            case HorizontalAlignment::RIGHT:
+              styles += u8"right";
+              break;
+            default:
+              styles += u8"general";
+              break;
+          }
+
+          styles += "\" vertical=\"";
+
+          switch (this_style.vert_align)
+          {
+            case VerticalAlignment::CENTER:
+              styles += u8"center";
+              break;
+            case VerticalAlignment::TOP:
+              styles += u8"top";
+              break;
+            default:
+              styles += u8"bottom";
+              break;
+          }
+
+          styles += u8"\" wrapText=\"";
+
+          if (this_style.wrap_text)
+          {
+            styles += u8"true";
+          }
+          else
+          {
+            styles += u8"false";
+          }
+
+          styles += u8"\"/></xf>";
+        }
+      }
+      
       styles += u8"</cellXfs>";
       styles += u8"<cellStyles count=\"1\">";
       styles += u8"<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>";

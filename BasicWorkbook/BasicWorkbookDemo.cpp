@@ -22,23 +22,24 @@ int main()
   BasicWorkbook::Workbook workbook;
 
   BasicWorkbook::Sheet &sheet1 = workbook.addSheet("sheet1");
-  sheet1.add_string_cell("A1", "col 1");
+  BasicWorkbook::cell_style_t center_bold_style = {BasicWorkbook::NumberFormat::TEXT, BasicWorkbook::HorizontalAlignment::CENTER, BasicWorkbook::VerticalAlignment::BOTTOM, false, true};
+  sheet1.add_string_cell("A1", "col 1", center_bold_style);
   sheet1.add_number_cell("A2", 1.0);
   sheet1.add_number_cell("A3", 2.0);
   sheet1.add_number_cell("A4", 3.0);
-  sheet1.add_string_cell("B1", "col 2");
+  sheet1.add_string_cell("B1", "col 2", center_bold_style);
   sheet1.add_number_cell("B2", 4.0);
   sheet1.add_number_cell("B3", 5.0);
   sheet1.add_number_cell("B4", 6.0);
-  sheet1.add_string_cell("C1", "col 3");
+  sheet1.add_string_cell("C1", "col 3", center_bold_style);
   sheet1.add_formula_cell("C2", "A2+B2");
   sheet1.add_formula_cell("C3", "A3+B3");
   sheet1.add_formula_cell("C4", "A4+B4");
 
   BasicWorkbook::Sheet &sheet2 = workbook.addSheet("sheet2");
-  sheet2.add_string_cell(1u, 1u, "col 1");
-  sheet2.add_string_cell(1u, 2u, "col 2");
-  sheet2.add_string_cell(1u, 3u, "col 3");
+  sheet2.add_string_cell(1u, 1u, "col 1", center_bold_style);
+  sheet2.add_string_cell(1u, 2u, "col 2", center_bold_style);
+  sheet2.add_string_cell(1u, 3u, "col 3", center_bold_style);
   
   for (uint32_t jRow = 2u; jRow <= 101u; jRow++)
   {
@@ -49,7 +50,8 @@ int main()
     sheet2.add_formula_cell(jRow, 3u, formula);
   }
 
-  sheet2.add_string_cell(102u, 2u, "total:");
+  BasicWorkbook::cell_style_t right_bold_style = {BasicWorkbook::NumberFormat::TEXT, BasicWorkbook::HorizontalAlignment::RIGHT, BasicWorkbook::VerticalAlignment::BOTTOM, false, true};
+  sheet2.add_merged_string_cell(102u, 1u, 102u, 2u, "total:", right_bold_style);
   std::string total = "SUM(" + BasicWorkbook::integerref_to_mixedref(2u, 3u) +
     ":" + BasicWorkbook::integerref_to_mixedref(101u, 3u) + ")";
   sheet2.add_formula_cell(102u, 3u, total);
