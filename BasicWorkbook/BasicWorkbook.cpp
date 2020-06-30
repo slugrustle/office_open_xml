@@ -966,7 +966,11 @@ namespace BasicWorkbook
    */
   Workbook::Workbook(void) noexcept
   {
-    /* Nothing. */
+    /**
+     * Add the generic style first so it becomes the default
+     * cell style.
+     */
+    this->addStyle(BasicWorkbook::generic_style);
   }
 
   /**
